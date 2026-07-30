@@ -1,0 +1,15 @@
+---
+description: Sempre atualizar backend e frontend após alterações no QuestArena
+alwaysApply: true
+---
+
+# Atualizar back e front após mudanças
+
+Sempre que alterar código deste projeto (backend Go e/ou frontend React):
+
+1. Recompilar/reiniciar o **backend** (`go build` ou `go run ./cmd/server` em `backend/`).
+2. Garantir que o **frontend** reflita as mudanças (`npm run dev` em `frontend/` já recarrega sozinho; se não estiver rodando, iniciar).
+3. Se o backend já estiver em execução, encerrar o processo antigo e subir de novo com o binário/código novo.
+4. Não encerrar a tarefa só com o código salvo: deixar back e front atualizados e utilizáveis.
+
+Em Windows/PowerShell, preferir comandos com `;` (não `&&`).

@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/bin
+**/.env
+**/firebase-service-account.json
+**/dist
+**/.DS_Store
+**/*.log
+agent-transcripts
+.cursor

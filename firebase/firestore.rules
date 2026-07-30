@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(teacherId) {
+      return isSignedIn() && request.auth.uid == teacherId;
+    }
+
+    match /teachers/{teacherId} {
+      allow read, write: if isOwner(teacherId);
+    }
+
+    match /quizzes/{quizId} {
+      allow read, write: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+
+      match /questions/{questionId} {
+        allow read, write: if isSignedIn()
+          && get(/databases/$(database)/documents/quizzes/$(quizId)).data.teacherId == request.auth.uid;
+      }
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+      allow write: if false; // only backend service account writes
+    }
+  }
+}
