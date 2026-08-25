@@ -1008,6 +1008,40 @@ label {
   color: #fca5a5;
 }
 
+.grades-card {
+  margin: 1.5rem auto 1.2rem;
+  max-width: 720px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem 1.1rem 1.2rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.grades-table-wrap {
+  overflow-x: auto;
+}
+
+.grades-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.grades-table th,
+.grades-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+}
+
+.grades-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 @media (max-width: 860px) {
   .home-shell,
   .editor-grid,

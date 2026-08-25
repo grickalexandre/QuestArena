@@ -17,7 +17,15 @@ type PublicQuestion = {
   total: number
 }
 
-type BoardEntry = { rank: number; playerId: string; nickname: string; avatar: number; score: number }
+type BoardEntry = {
+  rank: number
+  playerId: string
+  nickname: string
+  ra?: string
+  avatar: number
+  score: number
+  grade?: number
+}
 
 type ResultEntry = {
   playerId: string
@@ -34,6 +42,7 @@ export default function PlayPage() {
   const { connect, send, on } = useGameSocket()
   const [pin, setPin] = useState('')
   const [nickname, setNickname] = useState('')
+  const [ra, setRa] = useState('')
   const [avatar, setAvatar] = useState(() => Math.floor(Math.random() * AVATARS.length))
   const [phase, setPhase] = useState<'join' | 'lobby' | 'question' | 'reveal' | 'finished'>('join')
   const [playerId, setPlayerId] = useState('')
@@ -139,7 +148,7 @@ export default function PlayPage() {
     e.preventDefault()
     setError('')
     connect()
-    send('join', { pin: pin.trim(), nickname: nickname.trim(), avatar })
+    send('join', { pin: pin.trim(), nickname: nickname.trim(), ra: ra.trim(), avatar })
   }
 
   function answerChoice(choice: number) {
@@ -210,6 +219,17 @@ export default function PlayPage() {
             />
           </label>
           <label>
+            RA
+            <input
+              value={ra}
+              onChange={(e) => setRa(e.target.value.replace(/\s/g, '').slice(0, 20))}
+              placeholder="Seu RA"
+              required
+              minLength={3}
+              autoComplete="off"
+            />
+          </label>
+          <label>
             Nickname
             <input
               value={nickname}
@@ -233,6 +253,7 @@ export default function PlayPage() {
           <div className="avatar-big lobby">{avatarEmoji(avatar)}</div>
           <h1>Bem-vindo, {nickname}</h1>
           <p className="lede">{quizTitle}</p>
+          <p className="muted">RA {ra}</p>
           <div className="pulse-ring" />
           <p>Aguardando o professor iniciar...</p>
           {error && <p className="error">{error}</p>}
@@ -385,13 +406,17 @@ export default function PlayPage() {
           <h2>Fim da quest!</h2>
           <Podium board={board} />
           <Leaderboard board={board} />
-          <p className="muted">Sua posição: {myRank ? `#${myRank.rank}` : '—'}</p>
+          <p className="muted">
+            Sua posição: {myRank ? `#${myRank.rank}` : '—'}
+            {myRank?.grade != null ? ` · Nota ${myRank.grade.toFixed(1).replace('.', ',')}` : ''}
+          </p>
           <button
             className="btn btn-primary"
             onClick={() => {
               setPhase('join')
               setPin('')
               setNickname('')
+              setRa('')
               setPlayerId('')
               setAvatar(Math.floor(Math.random() * AVATARS.length))
             }}

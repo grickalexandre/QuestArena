@@ -56,13 +56,15 @@ type Client struct {
 }
 
 type Player struct {
-	ID       string `json:"id"`
-	Nickname string `json:"nickname"`
-	Score    int    `json:"score"`
-	Avatar   int    `json:"avatar"`
-	conn     *Client
-	answered bool
-	choice   int
+	ID           string `json:"id"`
+	Nickname     string `json:"nickname"`
+	RA           string `json:"ra"`
+	Score        int    `json:"score"`
+	CorrectCount int    `json:"correctCount"`
+	Avatar       int    `json:"avatar"`
+	conn         *Client
+	answered     bool
+	choice       int
 }
 
 type answerRecord struct {
@@ -286,6 +288,10 @@ func (c *Client) handleHostJoin(data json.RawMessage) {
 			payload["questionResult"] = room.buildResultPayloadLocked()
 		}
 	}
+	if room.Phase == PhaseFinished {
+		payload["leaderboard"] = leaderboard(room)
+		payload["grades"] = room.gradesPayloadLocked()
+	}
 	c.emit("hosted", payload)
 }
 
@@ -293,14 +299,21 @@ func (c *Client) handlePlayerJoin(data json.RawMessage) {
 	var req struct {
 		PIN      string `json:"pin"`
 		Nickname string `json:"nickname"`
+		RA       string `json:"ra"`
 		Avatar   int    `json:"avatar"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		c.sendError("invalid join")
 		return
 	}
-	if len(req.Nickname) < 2 || len(req.Nickname) > 20 {
-		c.sendError("nickname must be 2-20 characters")
+	nick := strings.TrimSpace(req.Nickname)
+	if len([]rune(nick)) < 2 || len([]rune(nick)) > 20 {
+		c.sendError("apelido deve ter 2 a 20 caracteres")
+		return
+	}
+	ra := normalizeRA(req.RA)
+	if !validRA(ra) {
+		c.sendError("informe um RA válido (3 a 20 caracteres, letras ou números)")
 		return
 	}
 	const avatarCount = 12
@@ -320,14 +333,19 @@ func (c *Client) handlePlayerJoin(data json.RawMessage) {
 		return
 	}
 	for _, p := range room.Players {
-		if p.Nickname == req.Nickname {
-			c.sendError("nickname já em uso")
+		if strings.EqualFold(p.Nickname, nick) {
+			c.sendError("apelido já em uso")
+			return
+		}
+		if p.RA == ra {
+			c.sendError("este RA já entrou na partida")
 			return
 		}
 	}
 	player := &Player{
 		ID:       uuid.NewString(),
-		Nickname: req.Nickname,
+		Nickname: nick,
+		RA:       ra,
 		Avatar:   avatar,
 		conn:     c,
 		choice:   -1,
@@ -341,6 +359,7 @@ func (c *Client) handlePlayerJoin(data json.RawMessage) {
 	c.emit("joined", map[string]any{
 		"playerId":  player.ID,
 		"nickname":  player.Nickname,
+		"ra":        player.RA,
 		"avatar":    player.Avatar,
 		"pin":       room.PIN,
 		"quizTitle": room.Quiz.Title,
@@ -490,6 +509,9 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 	player.answered = true
 	player.choice = choice
 	player.Score += points
+	if correct {
+		player.CorrectCount++
+	}
 	room.Answers[player.ID] = answerRecord{
 		playerID:   player.ID,
 		choice:     choice,
@@ -706,18 +728,27 @@ func (r *Room) finishLocked() {
 	r.cancelTimersLocked()
 	r.Phase = PhaseFinished
 	board := leaderboard(r)
+	grades := r.gradesPayloadLocked()
 	r.broadcastLocked("finished", map[string]any{
 		"leaderboard": board,
+		"grades":      grades,
 		"quizTitle":   r.Quiz.Title,
+		"total":       len(r.Questions),
+		"maxScore":    maxQuizXP(r.Questions),
 	})
 
 	ranking := make([]models.RankingEntry, 0, len(board))
 	for i, e := range board {
 		ranking = append(ranking, models.RankingEntry{
-			PlayerID: e["playerId"].(string),
-			Nickname: e["nickname"].(string),
-			Score:    e["score"].(int),
-			Rank:     i + 1,
+			PlayerID:     e["playerId"].(string),
+			Nickname:     e["nickname"].(string),
+			RA:           e["ra"].(string),
+			Score:        e["score"].(int),
+			CorrectCount: e["correctCount"].(int),
+			Total:        len(r.Questions),
+			MaxScore:     maxQuizXP(r.Questions),
+			Grade:        e["grade"].(float64),
+			Rank:         i + 1,
 		})
 	}
 	rec := &models.SessionRecord{
@@ -735,6 +766,28 @@ func (r *Room) finishLocked() {
 	}()
 }
 
+func (r *Room) gradesPayloadLocked() []map[string]any {
+	maxScore := maxQuizXP(r.Questions)
+	total := len(r.Questions)
+	board := leaderboard(r)
+	out := make([]map[string]any, 0, len(board))
+	for _, e := range board {
+		out = append(out, map[string]any{
+			"rank":         e["rank"],
+			"playerId":     e["playerId"],
+			"ra":           e["ra"],
+			"nickname":     e["nickname"],
+			"avatar":       e["avatar"],
+			"correctCount": e["correctCount"],
+			"total":        total,
+			"score":        e["score"],
+			"maxScore":     maxScore,
+			"grade":        e["grade"],
+		})
+	}
+	return out
+}
+
 func leaderboard(r *Room) []map[string]any {
 	list := make([]*Player, 0, len(r.Players))
 	for _, p := range r.Players {
@@ -746,14 +799,19 @@ func leaderboard(r *Room) []map[string]any {
 		}
 		return list[i].Score > list[j].Score
 	})
+	maxScore := maxQuizXP(r.Questions)
+	total := len(r.Questions)
 	out := make([]map[string]any, 0, len(list))
 	for i, p := range list {
 		out = append(out, map[string]any{
-			"rank":     i + 1,
-			"playerId": p.ID,
-			"nickname": p.Nickname,
-			"avatar":   p.Avatar,
-			"score":    p.Score,
+			"rank":         i + 1,
+			"playerId":     p.ID,
+			"nickname":     p.Nickname,
+			"ra":           p.RA,
+			"avatar":       p.Avatar,
+			"score":        p.Score,
+			"correctCount": p.CorrectCount,
+			"grade":        calcGrade(p.CorrectCount, total, p.Score, maxScore),
 		})
 	}
 	return out
@@ -763,10 +821,12 @@ func publicPlayers(r *Room) []map[string]any {
 	out := make([]map[string]any, 0, len(r.Players))
 	for _, p := range r.Players {
 		out = append(out, map[string]any{
-			"id":       p.ID,
-			"nickname": p.Nickname,
-			"avatar":   p.Avatar,
-			"score":    p.Score,
+			"id":           p.ID,
+			"nickname":     p.Nickname,
+			"ra":           p.RA,
+			"avatar":       p.Avatar,
+			"score":        p.Score,
+			"correctCount": p.CorrectCount,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

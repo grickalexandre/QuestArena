@@ -4,7 +4,7 @@ import { avatarEmoji } from '../../lib/avatars'
 import { useAuth } from '../../lib/auth'
 import { useGameSocket } from '../../lib/useGameSocket'
 
-type Player = { id: string; nickname: string; avatar: number; score: number }
+type Player = { id: string; nickname: string; ra?: string; avatar: number; score: number }
 type PublicQuestion = {
   id: string
   type?: 'multiple_choice' | 'essay'
@@ -15,7 +15,27 @@ type PublicQuestion = {
   index: number
   total: number
 }
-type BoardEntry = { rank: number; playerId: string; nickname: string; avatar: number; score: number }
+type BoardEntry = {
+  rank: number
+  playerId: string
+  nickname: string
+  ra?: string
+  avatar: number
+  score: number
+  correctCount?: number
+  grade?: number
+}
+type GradeRow = {
+  rank: number
+  playerId: string
+  ra: string
+  nickname: string
+  correctCount: number
+  total: number
+  score: number
+  maxScore: number
+  grade: number
+}
 type ResultEntry = {
   playerId: string
   nickname: string
@@ -44,6 +64,7 @@ export default function HostPage() {
   const [quizTitle, setQuizTitle] = useState('')
   const [hosted, setHosted] = useState(false)
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
+  const [grades, setGrades] = useState<GradeRow[]>([])
   const pendingAction = useRef<'start' | 'next' | null>(null)
 
   const remaining = useCountdown(endsAt)
@@ -75,6 +96,8 @@ export default function HostPage() {
             results: ResultEntry[]
             autoNextInSec?: number
           }
+          leaderboard?: BoardEntry[]
+          grades?: GradeRow[]
         }
         setHosted(true)
         setError('')
@@ -91,6 +114,8 @@ export default function HostPage() {
           setEndsAt(null)
           setAutoNextIn(d.questionResult.autoNextInSec ?? 5)
         }
+        if (d.leaderboard) setBoard(d.leaderboard)
+        if (d.grades) setGrades(d.grades)
         const action = pendingAction.current
         pendingAction.current = null
         if (action) send(action)
@@ -127,9 +152,10 @@ export default function HostPage() {
         setAutoNextIn(d.autoNextInSec ?? 5)
       }),
       on('finished', (data) => {
-        const d = data as { leaderboard: BoardEntry[] }
+        const d = data as { leaderboard: BoardEntry[]; grades?: GradeRow[] }
         setPhase('finished')
         setBoard(d.leaderboard)
+        setGrades(d.grades || [])
         setAutoNextIn(null)
       }),
       on('error', (data) => {
@@ -185,7 +211,7 @@ export default function HostPage() {
 
       {phase === 'lobby' && (
         <section className="host-lobby">
-          <p className="lede">Alunos entram em /play com este PIN</p>
+          <p className="lede">Alunos entram em /play com PIN, RA e apelido</p>
           <div className="player-grid">
             {players.map((p) => (
               <div key={p.id} className="player-chip">
@@ -193,6 +219,7 @@ export default function HostPage() {
                   {avatarEmoji(p.avatar)}
                 </span>
                 {p.nickname}
+                {p.ra ? <span className="muted tiny"> · RA {p.ra}</span> : null}
               </div>
             ))}
           </div>
@@ -285,6 +312,58 @@ export default function HostPage() {
           <h2>Partida encerrada</h2>
           <Podium board={board} />
           <Leaderboard board={board} />
+          <div className="grades-card">
+            <h3>Notas da turma</h3>
+            <p className="muted tiny">
+              Nota 0–10 = 70% acertos + 30% XP (quem responde mais rápido sobe a nota). Baixe o CSV para somar com
+              outros quizzes pelo RA.
+            </p>
+            <div className="grades-table-wrap">
+              <table className="grades-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>RA</th>
+                    <th>Apelido</th>
+                    <th>Acertos</th>
+                    <th>XP</th>
+                    <th>Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(grades.length ? grades : board).map((g) => {
+                    const row = g as GradeRow & BoardEntry
+                    return (
+                      <tr key={row.playerId}>
+                        <td>{row.rank}</td>
+                        <td>{row.ra || '—'}</td>
+                        <td>{row.nickname}</td>
+                        <td>
+                          {row.correctCount ?? '—'}
+                          {row.total != null ? `/${row.total}` : ''}
+                        </td>
+                        <td>
+                          {row.score}
+                          {row.maxScore != null ? `/${row.maxScore}` : ''}
+                        </td>
+                        <td>
+                          <strong>{formatGrade(row.grade)}</strong>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <button
+              className="btn btn-accent"
+              type="button"
+              disabled={grades.length === 0 && board.length === 0}
+              onClick={() => downloadGradesCsv(quizTitle, pin || '', grades.length ? grades : boardToGrades(board))}
+            >
+              Baixar CSV das notas
+            </button>
+          </div>
           <Link className="btn btn-primary" to="/teacher">
             Voltar
           </Link>
@@ -305,6 +384,7 @@ export function Leaderboard({ board }: { board: BoardEntry[] }) {
               {avatarEmoji(e.avatar)}
             </span>
             {e.nickname}
+            {e.ra ? <span className="muted tiny"> · {e.ra}</span> : null}
           </span>
           <span className="xp">{e.score} XP</span>
         </li>
@@ -331,7 +411,9 @@ export function Podium({ board }: { board: BoardEntry[] }) {
             {avatarEmoji(entry!.avatar)}
           </span>
           <strong>{entry!.nickname}</strong>
+          {entry!.ra ? <span className="muted tiny">RA {entry!.ra}</span> : null}
           <span>{entry!.score} XP</span>
+          {entry!.grade != null ? <span>Nota {formatGrade(entry!.grade)}</span> : null}
           <div className="block">{place}</div>
         </div>
       ))}
@@ -358,4 +440,61 @@ function formatClock(totalSec: number) {
   const m = Math.floor(totalSec / 60)
   const s = totalSec % 60
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function formatGrade(n?: number) {
+  if (n == null || Number.isNaN(n)) return '—'
+  return n.toFixed(1).replace('.', ',')
+}
+
+function boardToGrades(board: BoardEntry[]): GradeRow[] {
+  return board.map((e) => ({
+    rank: e.rank,
+    playerId: e.playerId,
+    ra: e.ra || '',
+    nickname: e.nickname,
+    correctCount: e.correctCount ?? 0,
+    total: 0,
+    score: e.score,
+    maxScore: 0,
+    grade: e.grade ?? 0,
+  }))
+}
+
+function csvCell(value: string | number) {
+  const s = String(value)
+  if (/[;"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+function downloadGradesCsv(quizTitle: string, pin: string, grades: GradeRow[]) {
+  const header = ['RA', 'Apelido', 'Acertos', 'Total', 'XP', 'XP_max', 'Nota']
+  const lines = [
+    '# Nota = 70% acertos + 30% XP (resposta mais rapida vale mais). Some as planilhas pelo RA.',
+    `# Quiz: ${quizTitle || 'QuestArena'} | PIN: ${pin}`,
+    header.join(';'),
+    ...grades.map((g) =>
+      [
+        csvCell(g.ra),
+        csvCell(g.nickname),
+        g.correctCount,
+        g.total,
+        g.score,
+        g.maxScore,
+        formatGrade(g.grade),
+      ].join(';'),
+    ),
+  ]
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const slug = (quizTitle || 'quiz')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `notas-${slug || 'quiz'}-PIN${pin}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
 }

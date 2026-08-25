@@ -64,8 +64,13 @@ type SessionRecord struct {
 }
 
 type RankingEntry struct {
-	PlayerID string `json:"playerId" firestore:"playerId"`
-	Nickname string `json:"nickname" firestore:"nickname"`
-	Score    int    `json:"score" firestore:"score"`
-	Rank     int    `json:"rank" firestore:"rank"`
+	PlayerID     string  `json:"playerId" firestore:"playerId"`
+	Nickname     string  `json:"nickname" firestore:"nickname"`
+	RA           string  `json:"ra" firestore:"ra"`
+	Score        int     `json:"score" firestore:"score"`
+	CorrectCount int     `json:"correctCount" firestore:"correctCount"`
+	Total        int     `json:"total" firestore:"total"`
+	MaxScore     int     `json:"maxScore" firestore:"maxScore"`
+	Grade        float64 `json:"grade" firestore:"grade"`
+	Rank         int     `json:"rank" firestore:"rank"`
 }

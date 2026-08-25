@@ -7,7 +7,7 @@ export default function HomePage() {
         <p className="brand">QuestArena</p>
         <h1>Arena de quizzes ao vivo</h1>
         <p className="lede">
-          Professores criam desafios com peso e tempo. Alunos entram com PIN e competem por XP em tempo real.
+          Professores criam desafios com peso e tempo. Alunos entram com PIN, RA e apelido.
         </p>
         <div className="cta-row">
           <Link className="btn btn-primary" to="/teacher/login">
