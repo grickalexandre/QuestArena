@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/questarena/questarena/internal/auth"
 	"github.com/questarena/questarena/internal/game"
 	"github.com/questarena/questarena/internal/models"
+	"github.com/questarena/questarena/internal/seed"
 	"github.com/questarena/questarena/internal/store"
 )
 
@@ -170,6 +172,9 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListQuizzes(w http.ResponseWriter, r *http.Request) {
 	teacher := auth.FromContext(r.Context())
+	if err := seed.EnsureHerancaQuiz(r.Context(), s.Store, teacher.ID); err != nil {
+		log.Printf("seed heranca quiz: %v", err)
+	}
 	list, err := s.Store.ListQuizzes(r.Context(), teacher.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
