@@ -10,8 +10,8 @@ import (
 
 const (
 	herancaQuizPrefix = "seed-heranca-conta-"
-	herancaTitle      = "Herança C# — até Conta Corrente"
-	herancaDesc       = "15 questões de 1 minuto: herança, virtual/override, polimorfismo, classe abstrata, Animal e Conta Corrente."
+	herancaTitle      = "Quest 3 — Item, Animal e Conta Corrente"
+	herancaDesc       = "15 questões de 1 minuto: da herança à conta corrente (virtual/override, abstract, Animal e cheque especial)."
 	timeLimitOneMin   = 60
 )
 
@@ -40,6 +40,12 @@ func EnsureHerancaQuiz(ctx context.Context, st store.Store, teacherID string) er
 			Description: herancaDesc,
 		}
 		if err := st.CreateQuiz(ctx, q); err != nil {
+			return err
+		}
+	} else if existing.Title != herancaTitle || existing.Description != herancaDesc {
+		existing.Title = herancaTitle
+		existing.Description = herancaDesc
+		if err := st.UpdateQuiz(ctx, existing); err != nil {
 			return err
 		}
 	}
