@@ -190,3 +190,41 @@ func (f *FirestoreStore) SaveSession(ctx context.Context, s *models.SessionRecor
 	_, err := f.client.Collection("sessions").Doc(s.ID).Set(ctx, s)
 	return err
 }
+
+func (f *FirestoreStore) ListSessions(ctx context.Context, teacherID string) ([]models.SessionRecord, error) {
+	iter := f.client.Collection("sessions").Where("teacherId", "==", teacherID).Documents(ctx)
+	out := make([]models.SessionRecord, 0)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var s models.SessionRecord
+		if err := doc.DataTo(&s); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].FinishedAt.After(out[j].FinishedAt)
+	})
+	return out, nil
+}
+
+func (f *FirestoreStore) GetSession(ctx context.Context, teacherID, sessionID string) (*models.SessionRecord, error) {
+	doc, err := f.client.Collection("sessions").Doc(sessionID).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var s models.SessionRecord
+	if err := doc.DataTo(&s); err != nil {
+		return nil, err
+	}
+	if s.TeacherID != teacherID {
+		return nil, fmt.Errorf("forbidden")
+	}
+	return &s, nil
+}

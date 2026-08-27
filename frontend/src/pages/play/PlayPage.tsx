@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AVATARS, avatarEmoji } from '../../lib/avatars'
 import { useGameSocket } from '../../lib/useGameSocket'
@@ -36,16 +36,70 @@ type ResultEntry = {
   choice?: number
 }
 
+type QuestionResult = {
+  type?: QuestionType
+  correctIndex: number
+  expectedAnswer?: string
+  leaderboard: BoardEntry[]
+  results: ResultEntry[]
+  autoNextInSec?: number
+}
+
+type JoinedPayload = {
+  playerId: string
+  nickname?: string
+  ra?: string
+  quizTitle: string
+  avatar?: number
+  phase?: 'lobby' | 'question' | 'reveal' | 'finished'
+  answered?: boolean
+  choice?: number
+  question?: PublicQuestion
+  endsAt?: string
+  questionResult?: QuestionResult
+  leaderboard?: BoardEntry[]
+}
+
 const COLORS = ['#e21b3c', '#1368ce', '#d89e00', '#26890c']
+const PLAY_SESSION_KEY = 'qa_play_session'
+
+type PlaySession = {
+  pin: string
+  nickname: string
+  ra: string
+  avatar: number
+  playerId?: string
+}
+
+function loadPlaySession(): PlaySession | null {
+  try {
+    const raw = sessionStorage.getItem(PLAY_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PlaySession
+    if (!parsed.pin || !parsed.ra || !parsed.nickname) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function savePlaySession(s: PlaySession) {
+  sessionStorage.setItem(PLAY_SESSION_KEY, JSON.stringify(s))
+}
+
+function clearPlaySession() {
+  sessionStorage.removeItem(PLAY_SESSION_KEY)
+}
 
 export default function PlayPage() {
-  const { connect, send, on } = useGameSocket()
-  const [pin, setPin] = useState('')
-  const [nickname, setNickname] = useState('')
-  const [ra, setRa] = useState('')
-  const [avatar, setAvatar] = useState(() => Math.floor(Math.random() * AVATARS.length))
+  const { connect, send, on, onOpen, onClose, connected } = useGameSocket()
+  const saved = useMemo(() => loadPlaySession(), [])
+  const [pin, setPin] = useState(saved?.pin ?? '')
+  const [nickname, setNickname] = useState(saved?.nickname ?? '')
+  const [ra, setRa] = useState(saved?.ra ?? '')
+  const [avatar, setAvatar] = useState(() => saved?.avatar ?? Math.floor(Math.random() * AVATARS.length))
   const [phase, setPhase] = useState<'join' | 'lobby' | 'question' | 'reveal' | 'finished'>('join')
-  const [playerId, setPlayerId] = useState('')
+  const [playerId, setPlayerId] = useState(saved?.playerId ?? '')
   const [quizTitle, setQuizTitle] = useState('')
   const [question, setQuestion] = useState<PublicQuestion | null>(null)
   const [endsAt, setEndsAt] = useState<number | null>(null)
@@ -61,6 +115,7 @@ export default function PlayPage() {
   const [board, setBoard] = useState<BoardEntry[]>([])
   const [error, setError] = useState('')
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
+  const [reconnecting, setReconnecting] = useState(false)
   const remaining = useCountdown(endsAt)
   const timerPct = useMemo(() => {
     if (!question || !endsAt) return 0
@@ -69,41 +124,100 @@ export default function PlayPage() {
     return Math.min(100, (left / total) * 100)
   }, [question, endsAt, remaining])
 
+  const credsRef = useRef({ pin, nickname, ra, avatar, playerId, phase })
+  credsRef.current = { pin, nickname, ra, avatar, playerId, phase }
+
   useEffect(() => {
     if (autoNextIn == null || autoNextIn <= 0) return
     const id = setTimeout(() => setAutoNextIn((v) => (v == null ? null : v - 1)), 1000)
     return () => clearTimeout(id)
   }, [autoNextIn])
 
+  function applyQuestion(q: PublicQuestion, endsAtIso?: string, alreadyAnswered?: boolean, choice?: number) {
+    setQuestion({
+      ...q,
+      type: q.type || 'multiple_choice',
+    })
+    setEndsAt(endsAtIso ? new Date(endsAtIso).getTime() : null)
+    setSelected(typeof choice === 'number' && choice >= 0 ? choice : null)
+    setEssayDraft('')
+    setSubmittedText('')
+    setLocked(!!alreadyAnswered)
+    setCorrectIndex(null)
+    setExpectedAnswer('')
+    setLastPoints(null)
+    setLastSimilarity(null)
+    setLastCorrect(null)
+    setAutoNextIn(null)
+  }
+
+  function applyResult(d: QuestionResult, id: string) {
+    setPhase('reveal')
+    setCorrectIndex(d.correctIndex)
+    setExpectedAnswer(d.expectedAnswer || '')
+    setBoard(d.leaderboard)
+    setEndsAt(null)
+    setAutoNextIn(d.autoNextInSec ?? 5)
+    const mine = d.results.find((r) => r.playerId === id)
+    if (mine) {
+      setLastPoints(mine.points)
+      setLastCorrect(mine.correct)
+      if (typeof mine.similarity === 'number') setLastSimilarity(mine.similarity)
+      if (mine.text) setSubmittedText(mine.text)
+      if (typeof mine.choice === 'number' && mine.choice >= 0) setSelected(mine.choice)
+    }
+  }
+
+  function sendJoin(next = credsRef.current) {
+    if (!next.pin.trim() || !next.ra.trim() || !next.nickname.trim()) return
+    send('join', {
+      pin: next.pin.trim(),
+      nickname: next.nickname.trim(),
+      ra: next.ra.trim(),
+      avatar: next.avatar,
+    })
+  }
+
   useEffect(() => {
     const offs = [
       on('joined', (data) => {
-        const d = data as { playerId: string; quizTitle: string; avatar?: number }
+        const d = data as JoinedPayload
         setPlayerId(d.playerId)
         setQuizTitle(d.quizTitle)
+        if (d.nickname) setNickname(d.nickname)
+        if (d.ra) setRa(d.ra)
         if (typeof d.avatar === 'number') setAvatar(d.avatar)
-        setPhase('lobby')
         setError('')
+        setReconnecting(false)
+        const creds = credsRef.current
+        savePlaySession({
+          pin: creds.pin.trim(),
+          nickname: (d.nickname || creds.nickname).trim(),
+          ra: (d.ra || creds.ra).trim(),
+          avatar: typeof d.avatar === 'number' ? d.avatar : creds.avatar,
+          playerId: d.playerId,
+        })
+        const nextPhase = d.phase || 'lobby'
+        if (nextPhase === 'question' && d.question) {
+          setPhase('question')
+          applyQuestion(d.question, d.endsAt, d.answered, d.choice)
+        } else if (nextPhase === 'reveal' && d.question) {
+          applyQuestion(d.question, d.endsAt, true, d.choice)
+          if (d.questionResult) applyResult(d.questionResult, d.playerId)
+          else setPhase('reveal')
+        } else if (nextPhase === 'finished') {
+          setPhase('finished')
+          if (d.leaderboard) setBoard(d.leaderboard)
+        } else {
+          setPhase('lobby')
+        }
       }),
       on('question', (data) => {
         const d = data as { question: PublicQuestion; endsAt: string }
         setPhase('question')
-        setQuestion({
-          ...d.question,
-          type: d.question.type || 'multiple_choice',
-        })
-        setEndsAt(new Date(d.endsAt).getTime())
-        setSelected(null)
-        setEssayDraft('')
-        setSubmittedText('')
-        setLocked(false)
-        setCorrectIndex(null)
-        setExpectedAnswer('')
-        setLastPoints(null)
-        setLastSimilarity(null)
-        setLastCorrect(null)
-        setAutoNextIn(null)
+        applyQuestion(d.question, d.endsAt, false)
         setError('')
+        setReconnecting(false)
       }),
       on('answer_ack', (data) => {
         const d = data as { points: number; similarity?: number }
@@ -112,43 +226,67 @@ export default function PlayPage() {
         if (typeof d.similarity === 'number') setLastSimilarity(d.similarity)
       }),
       on('question_result', (data) => {
-        const d = data as {
-          type?: QuestionType
-          correctIndex: number
-          expectedAnswer?: string
-          leaderboard: BoardEntry[]
-          results: ResultEntry[]
-          autoNextInSec?: number
-        }
-        setPhase('reveal')
-        setCorrectIndex(d.correctIndex)
-        setExpectedAnswer(d.expectedAnswer || '')
-        setBoard(d.leaderboard)
-        setEndsAt(null)
-        setAutoNextIn(d.autoNextInSec ?? 5)
-        const mine = d.results.find((r) => r.playerId === playerId)
-        if (mine) {
-          setLastPoints(mine.points)
-          setLastCorrect(mine.correct)
-          if (typeof mine.similarity === 'number') setLastSimilarity(mine.similarity)
-          if (mine.text) setSubmittedText(mine.text)
-        }
+        applyResult(data as QuestionResult, credsRef.current.playerId)
       }),
       on('finished', (data) => {
         setPhase('finished')
         setBoard((data as { leaderboard: BoardEntry[] }).leaderboard)
         setAutoNextIn(null)
+        setReconnecting(false)
       }),
-      on('error', (data) => setError((data as { message: string }).message)),
+      on('error', (data) => {
+        const msg = (data as { message: string }).message
+        setError(msg)
+        if (/PIN inválido/i.test(msg)) {
+          clearPlaySession()
+          setPhase('join')
+          setReconnecting(false)
+        }
+      }),
+      onOpen(() => {
+        const creds = credsRef.current
+        const stored = loadPlaySession()
+        if (!stored) return
+        setReconnecting(false)
+        sendJoin({
+          pin: stored.pin,
+          nickname: stored.nickname,
+          ra: stored.ra,
+          avatar: stored.avatar,
+          playerId: stored.playerId || creds.playerId,
+          phase: creds.phase,
+        })
+      }),
+      onClose(() => {
+        if (credsRef.current.phase !== 'join') setReconnecting(true)
+      }),
     ]
+    const stored = loadPlaySession()
+    if (stored) {
+      connect()
+    }
     return () => offs.forEach((off) => off())
-  }, [on, playerId])
+  }, [on, onOpen, onClose, send, connect])
 
   function join(e: FormEvent) {
     e.preventDefault()
     setError('')
+    savePlaySession({ pin: pin.trim(), nickname: nickname.trim(), ra: ra.trim(), avatar })
     connect()
-    send('join', { pin: pin.trim(), nickname: nickname.trim(), ra: ra.trim(), avatar })
+    sendJoin({ pin, nickname, ra, avatar, playerId, phase })
+  }
+
+  function resetJoin() {
+    clearPlaySession()
+    setPhase('join')
+    setPin('')
+    setNickname('')
+    setRa('')
+    setPlayerId('')
+    setQuizTitle('')
+    setAvatar(Math.floor(Math.random() * AVATARS.length))
+    setReconnecting(false)
+    setError('')
   }
 
   function answerChoice(choice: number) {
@@ -245,6 +383,13 @@ export default function PlayPage() {
             Entrar como {avatarEmoji(avatar)} {nickname.trim() || '...'}
           </button>
         </form>
+      )}
+
+      {reconnecting && phase !== 'join' && (
+        <p className="muted banner">Reconectando à partida...</p>
+      )}
+      {phase !== 'join' && !connected && !reconnecting && (
+        <p className="muted banner">Sem conexão — tentando de novo...</p>
       )}
 
       {phase === 'lobby' && (
@@ -412,14 +557,7 @@ export default function PlayPage() {
           </p>
           <button
             className="btn btn-primary"
-            onClick={() => {
-              setPhase('join')
-              setPin('')
-              setNickname('')
-              setRa('')
-              setPlayerId('')
-              setAvatar(Math.floor(Math.random() * AVATARS.length))
-            }}
+            onClick={resetJoin}
           >
             Nova partida
           </button>

@@ -58,6 +58,9 @@ export default function QuizzesPage() {
           QuestArena
         </Link>
         <div className="top-actions">
+          <Link className="btn btn-ghost" to="/teacher/sessions">
+            Notas
+          </Link>
           <span className="pill">{teacher?.name}</span>
           <button className="btn btn-ghost" onClick={logout}>
             Sair

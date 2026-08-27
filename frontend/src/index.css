@@ -68,8 +68,23 @@ a {
   border-radius: 10px;
 }
 
-.banner {
-  margin: 0 1.5rem 1rem;
+.join-url-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0.8rem auto 0.4rem;
+  padding: 0.85rem 1rem;
+  max-width: 640px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+}
+
+.join-url-box strong {
+  font-size: 1.05rem;
+  word-break: break-all;
 }
 
 .btn {
@@ -732,6 +747,22 @@ label {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.45rem 0.85rem;
+}
+
+.player-chip.offline {
+  opacity: 0.45;
+}
+
+.session-grades {
+  margin-top: 1rem;
+}
+
+.host-question .btn-ghost {
+  margin-top: 0.75rem;
+}
+
+.play-shell .banner {
+  text-align: center;
 }
 
 .avatar {

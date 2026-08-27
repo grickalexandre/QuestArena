@@ -194,6 +194,48 @@ func (m *MemoryStore) SaveSession(_ context.Context, s *models.SessionRecord) er
 		s.ID = uuid.NewString()
 	}
 	cp := *s
+	if s.Ranking != nil {
+		cp.Ranking = make([]models.RankingEntry, len(s.Ranking))
+		copy(cp.Ranking, s.Ranking)
+	}
 	m.sessions[s.ID] = &cp
 	return nil
+}
+
+func (m *MemoryStore) ListSessions(_ context.Context, teacherID string) ([]models.SessionRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]models.SessionRecord, 0)
+	for _, s := range m.sessions {
+		if s.TeacherID == teacherID {
+			cp := *s
+			if s.Ranking != nil {
+				cp.Ranking = make([]models.RankingEntry, len(s.Ranking))
+				copy(cp.Ranking, s.Ranking)
+			}
+			out = append(out, cp)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].FinishedAt.After(out[j].FinishedAt)
+	})
+	return out, nil
+}
+
+func (m *MemoryStore) GetSession(_ context.Context, teacherID, sessionID string) (*models.SessionRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	s, ok := m.sessions[sessionID]
+	if !ok {
+		return nil, fmt.Errorf("session not found")
+	}
+	if s.TeacherID != teacherID {
+		return nil, fmt.Errorf("forbidden")
+	}
+	cp := *s
+	if s.Ranking != nil {
+		cp.Ranking = make([]models.RankingEntry, len(s.Ranking))
+		copy(cp.Ranking, s.Ranking)
+	}
+	return &cp, nil
 }

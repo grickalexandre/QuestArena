@@ -78,22 +78,23 @@ type answerRecord struct {
 }
 
 type Room struct {
-	PIN          string
-	SessionID    string
-	Quiz         models.Quiz
-	Questions    []models.Question
-	TeacherID    string
-	Phase        Phase
-	CurrentIndex int
-	QuestionAt   time.Time
-	Deadline     time.Time
-	Host         *Client
-	Players      map[string]*Player
-	Answers      map[string]answerRecord
-	timerCancel  context.CancelFunc
+	PIN           string
+	SessionID     string
+	Quiz          models.Quiz
+	Questions     []models.Question
+	TeacherID     string
+	Phase         Phase
+	CurrentIndex  int
+	QuestionAt    time.Time
+	Deadline      time.Time
+	StartedAt     time.Time
+	Host          *Client
+	Players       map[string]*Player
+	Answers       map[string]answerRecord
+	timerCancel   context.CancelFunc
 	advanceCancel context.CancelFunc
-	mu           sync.Mutex
-	hub          *Hub
+	mu            sync.Mutex
+	hub           *Hub
 }
 
 type Hub struct {
@@ -132,6 +133,7 @@ func (h *Hub) CreateRoom(quiz models.Quiz, questions []models.Question, teacherI
 		hub:       h,
 	}
 	h.rooms[pin] = room
+	log.Printf("room created pin=%s quiz=%q teacher=%s", pin, quiz.Title, teacherID)
 	return room, nil
 }
 
@@ -261,7 +263,8 @@ func (c *Client) handleHostJoin(data json.RawMessage) {
 	}
 	room := c.hub.GetRoom(req.PIN)
 	if room == nil {
-		c.sendError("room not found")
+		log.Printf("host_join rejected pin=%s (sala inexistente)", req.PIN)
+		c.sendError("sala não encontrada — volte e inicie ao vivo de novo")
 		return
 	}
 	room.mu.Lock()
@@ -323,40 +326,87 @@ func (c *Client) handlePlayerJoin(data json.RawMessage) {
 	}
 	room := c.hub.GetRoom(req.PIN)
 	if room == nil {
-		c.sendError("PIN inválido")
+		log.Printf("join rejected pin=%s ra=%s (PIN inválido)", req.PIN, ra)
+		c.sendError("PIN inválido — peça um PIN novo ao professor")
 		return
 	}
 	room.mu.Lock()
 	defer room.mu.Unlock()
+
+	if existing := findPlayerByRA(room, ra); existing != nil {
+		if room.Phase == PhaseLobby {
+			if !strings.EqualFold(existing.Nickname, nick) {
+				if nickTakenByOther(room, nick, existing.ID) {
+					c.sendError("apelido já em uso")
+					return
+				}
+				existing.Nickname = nick
+			}
+			existing.Avatar = avatar
+		}
+		c.attachPlayerLocked(room, existing)
+		log.Printf("player rejoin pin=%s ra=%s nick=%s connected=%d", room.PIN, existing.RA, existing.Nickname, countConnected(room))
+		room.broadcastLocked("player_joined", map[string]any{
+			"players": publicPlayers(room),
+		})
+		return
+	}
+
 	if room.Phase != PhaseLobby {
 		c.sendError("a partida já começou")
 		return
 	}
-	for _, p := range room.Players {
-		if strings.EqualFold(p.Nickname, nick) {
-			c.sendError("apelido já em uso")
-			return
-		}
-		if p.RA == ra {
-			c.sendError("este RA já entrou na partida")
-			return
-		}
+	if nickTakenByOther(room, nick, "") {
+		c.sendError("apelido já em uso")
+		return
 	}
 	player := &Player{
 		ID:       uuid.NewString(),
 		Nickname: nick,
 		RA:       ra,
 		Avatar:   avatar,
-		conn:     c,
 		choice:   -1,
 	}
 	room.Players[player.ID] = player
+	c.attachPlayerLocked(room, player)
+	log.Printf("player join pin=%s ra=%s nick=%s n=%d", room.PIN, player.RA, player.Nickname, len(room.Players))
+	room.broadcastLocked("player_joined", map[string]any{
+		"players": publicPlayers(room),
+	})
+}
+
+func findPlayerByRA(room *Room, ra string) *Player {
+	for _, p := range room.Players {
+		if p.RA == ra {
+			return p
+		}
+	}
+	return nil
+}
+
+func nickTakenByOther(room *Room, nick, exceptID string) bool {
+	for _, p := range room.Players {
+		if p.ID == exceptID {
+			continue
+		}
+		if strings.EqualFold(p.Nickname, nick) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) attachPlayerLocked(room *Room, player *Player) {
+	player.conn = c
 	c.role = RolePlayer
 	c.roomPIN = room.PIN
 	c.playerID = player.ID
 	c.nickname = player.Nickname
+	c.emit("joined", playerStatePayload(room, player))
+}
 
-	c.emit("joined", map[string]any{
+func playerStatePayload(room *Room, player *Player) map[string]any {
+	payload := map[string]any{
 		"playerId":  player.ID,
 		"nickname":  player.Nickname,
 		"ra":        player.RA,
@@ -364,10 +414,22 @@ func (c *Client) handlePlayerJoin(data json.RawMessage) {
 		"pin":       room.PIN,
 		"quizTitle": room.Quiz.Title,
 		"phase":     room.Phase,
-	})
-	room.broadcastLocked("player_joined", map[string]any{
-		"players": publicPlayers(room),
-	})
+		"answered":  player.answered,
+		"choice":    player.choice,
+		"score":     player.Score,
+	}
+	if room.Phase == PhaseQuestion || room.Phase == PhaseReveal {
+		payload["question"] = publicQuestion(room)
+		payload["endsAt"] = room.Deadline.UTC().Format(time.RFC3339Nano)
+		if room.Phase == PhaseReveal {
+			payload["questionResult"] = room.buildResultPayloadLocked()
+		}
+	}
+	if room.Phase == PhaseFinished {
+		payload["leaderboard"] = leaderboard(room)
+		payload["grades"] = room.gradesPayloadLocked()
+	}
+	return payload
 }
 
 func (c *Client) handleStart() {
@@ -386,9 +448,12 @@ func (c *Client) handleStart() {
 		c.sendError("quiz has no questions")
 		return
 	}
-	if len(room.Players) == 0 {
-		c.sendError("aguarde pelo menos 1 jogador")
+	if countConnected(room) == 0 {
+		c.sendError("aguarde pelo menos 1 jogador conectado")
 		return
+	}
+	if room.StartedAt.IsZero() {
+		room.StartedAt = time.Now().UTC()
 	}
 	room.CurrentIndex = 0
 	room.startQuestionLocked()
@@ -526,11 +591,13 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		"points":     points,
 		"similarity": similarity,
 	})
+	connected := countConnected(room)
+	answered := countAnsweredConnected(room)
 	room.broadcastLocked("answer_count", map[string]any{
-		"answered": countAnswered(room),
-		"total":    len(room.Players),
+		"answered": answered,
+		"total":    connected,
 	})
-	if countAnswered(room) == len(room.Players) {
+	if connected > 0 && answered == connected {
 		room.revealLocked()
 	}
 }
@@ -552,10 +619,20 @@ func calcScore(weight float64, timeLimitSec int, elapsed time.Duration) int {
 	return int(math.Round(base * ratio))
 }
 
-func countAnswered(room *Room) int {
+func countConnected(room *Room) int {
 	n := 0
 	for _, p := range room.Players {
-		if p.answered {
+		if p.conn != nil {
+			n++
+		}
+	}
+	return n
+}
+
+func countAnsweredConnected(room *Room) int {
+	n := 0
+	for _, p := range room.Players {
+		if p.conn != nil && p.answered {
 			n++
 		}
 	}
@@ -751,6 +828,10 @@ func (r *Room) finishLocked() {
 			Rank:         i + 1,
 		})
 	}
+	started := r.StartedAt
+	if started.IsZero() {
+		started = time.Now().UTC()
+	}
 	rec := &models.SessionRecord{
 		ID:         r.SessionID,
 		QuizID:     r.Quiz.ID,
@@ -758,7 +839,7 @@ func (r *Room) finishLocked() {
 		TeacherID:  r.TeacherID,
 		PIN:        r.PIN,
 		Ranking:    ranking,
-		StartedAt:  time.Now().UTC(),
+		StartedAt:  started,
 		FinishedAt: time.Now().UTC(),
 	}
 	go func() {
@@ -827,6 +908,7 @@ func publicPlayers(r *Room) []map[string]any {
 			"avatar":       p.Avatar,
 			"score":        p.Score,
 			"correctCount": p.CorrectCount,
+			"connected":    p.conn != nil,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -871,7 +953,7 @@ func (c *Client) cleanup() {
 	}
 	if c.role == RolePlayer {
 		if p, ok := room.Players[c.playerID]; ok && p.conn == c {
-			delete(room.Players, c.playerID)
+			p.conn = nil
 			room.broadcastLocked("player_left", map[string]any{
 				"players": publicPlayers(room),
 			})

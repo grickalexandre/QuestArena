@@ -9,19 +9,41 @@ export function useGameSocket() {
   const wsRef = useRef<WebSocket | null>(null)
   const handlers = useRef(new Map<string, Handler>())
   const openHandlers = useRef(new Set<() => void>())
+  const closeHandlers = useRef(new Set<() => void>())
+  const wantedRef = useRef(false)
+  const retryRef = useRef(0)
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const connectRef = useRef<() => WebSocket>(() => {
+    throw new Error('socket not ready')
+  })
   const [connected, setConnected] = useState(false)
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null)
 
+  const clearRetry = useCallback(() => {
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current)
+      retryTimer.current = null
+    }
+  }, [])
+
   const attach = useCallback((ws: WebSocket) => {
     ws.onopen = () => {
+      retryRef.current = 0
       setConnected(true)
       openHandlers.current.forEach((h) => h())
     }
     ws.onclose = () => {
-      if (wsRef.current === ws) {
-        wsRef.current = null
-        setConnected(false)
-      }
+      if (wsRef.current !== ws) return
+      wsRef.current = null
+      setConnected(false)
+      closeHandlers.current.forEach((h) => h())
+      if (!wantedRef.current) return
+      const delay = Math.min(8000, 400 * 2 ** retryRef.current)
+      retryRef.current = Math.min(retryRef.current + 1, 5)
+      clearRetry()
+      retryTimer.current = setTimeout(() => {
+        if (wantedRef.current) connectRef.current()
+      }, delay)
     }
     ws.onerror = () => {
       /* onclose follows */
@@ -45,9 +67,10 @@ export function useGameSocket() {
         /* ignore */
       }
     }
-  }, [])
+  }, [clearRetry])
 
   const connect = useCallback(() => {
+    wantedRef.current = true
     const cur = wsRef.current
     if (cur && (cur.readyState === WebSocket.OPEN || cur.readyState === WebSocket.CONNECTING)) {
       return cur
@@ -57,13 +80,16 @@ export function useGameSocket() {
     attach(ws)
     return ws
   }, [attach])
+  connectRef.current = connect
 
   const disconnect = useCallback(() => {
+    wantedRef.current = false
+    clearRetry()
     const ws = wsRef.current
     wsRef.current = null
     setConnected(false)
     ws?.close()
-  }, [])
+  }, [clearRetry])
 
   const send = useCallback(
     (type: string, data?: unknown) => {
@@ -98,7 +124,14 @@ export function useGameSocket() {
     }
   }, [])
 
+  const onClose = useCallback((handler: () => void) => {
+    closeHandlers.current.add(handler)
+    return () => {
+      closeHandlers.current.delete(handler)
+    }
+  }, [])
+
   useEffect(() => () => disconnect(), [disconnect])
 
-  return { connected, lastMessage, connect, disconnect, send, on, onOpen }
+  return { connected, lastMessage, connect, disconnect, send, on, onOpen, onClose }
 }

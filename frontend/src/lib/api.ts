@@ -27,6 +27,29 @@ export type Question = {
   order: number
 }
 
+export type RankingEntry = {
+  playerId: string
+  nickname: string
+  ra: string
+  score: number
+  correctCount: number
+  total: number
+  maxScore: number
+  grade: number
+  rank: number
+}
+
+export type SessionRecord = {
+  id: string
+  quizId: string
+  quizTitle: string
+  teacherId: string
+  pin: string
+  ranking: RankingEntry[]
+  startedAt: string
+  finishedAt: string
+}
+
 function authHeaders(token?: string | null): HeadersInit {
   const h: HeadersInit = { 'Content-Type': 'application/json' }
   if (token) h.Authorization = `Bearer ${token}`
@@ -41,7 +64,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ status: string; authMode: string }>('/api/health'),
+  health: () => request<{ status: string; authMode: string; lanIP?: string }>('/api/health'),
   authMode: () => request<{ mode: string }>('/api/auth/mode'),
   devLogin: (email: string, password: string, name?: string) =>
     request<{ token: string; teacher: Teacher }>('/api/auth/dev-login', {
@@ -104,6 +127,10 @@ export const api = {
         body: JSON.stringify({ quizId }),
       },
     ),
+  listSessions: (token: string) =>
+    request<SessionRecord[]>('/api/sessions', { headers: authHeaders(token) }),
+  getSession: (token: string, id: string) =>
+    request<SessionRecord>(`/api/sessions/${id}`, { headers: authHeaders(token) }),
 }
 
 export function wsUrl(): string {

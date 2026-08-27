@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,6 +53,8 @@ func (s *Server) Routes() http.Handler {
 	api.HandleFunc("/quizzes/{id}/questions/{qid}", s.handleDeleteQuestion).Methods("DELETE", "OPTIONS")
 
 	api.HandleFunc("/sessions", s.handleCreateSession).Methods("POST", "OPTIONS")
+	api.HandleFunc("/sessions", s.handleListSessions).Methods("GET", "OPTIONS")
+	api.HandleFunc("/sessions/{id}", s.handleGetSession).Methods("GET", "OPTIONS")
 
 	r.HandleFunc("/ws", s.Hub.ServeWS)
 
@@ -105,7 +108,30 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "authMode": s.AuthMode})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":   "ok",
+		"authMode": s.AuthMode,
+		"lanIP":    lanIPv4(),
+	})
+}
+
+func lanIPv4() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() {
+			continue
+		}
+		ip := ipnet.IP.To4()
+		if ip == nil || (ip[0] == 169 && ip[1] == 254) {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
 }
 
 func (s *Server) handleAuthMode(w http.ResponseWriter, _ *http.Request) {
@@ -388,6 +414,31 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		"quizId":    quiz.ID,
 		"quizTitle": quiz.Title,
 	})
+}
+
+func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
+	teacher := auth.FromContext(r.Context())
+	list, err := s.Store.ListSessions(r.Context(), teacher.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
+	teacher := auth.FromContext(r.Context())
+	id := mux.Vars(r)["id"]
+	rec, err := s.Store.GetSession(r.Context(), teacher.ID, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "forbidden") {
+			writeErr(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		writeErr(w, http.StatusNotFound, "session not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, rec)
 }
 
 func (s *Server) ensureQuizOwner(r *http.Request, teacherID, quizID string) error {

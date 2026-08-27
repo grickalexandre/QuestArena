@@ -22,4 +22,6 @@ type Store interface {
 	ListQuestions(ctx context.Context, quizID string) ([]models.Question, error)
 
 	SaveSession(ctx context.Context, s *models.SessionRecord) error
+	ListSessions(ctx context.Context, teacherID string) ([]models.SessionRecord, error)
+	GetSession(ctx context.Context, teacherID, sessionID string) (*models.SessionRecord, error)
 }

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { avatarEmoji } from '../../lib/avatars'
+import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { downloadGradesCsv, formatGrade } from '../../lib/gradesCsv'
 import { useGameSocket } from '../../lib/useGameSocket'
 
-type Player = { id: string; nickname: string; ra?: string; avatar: number; score: number }
+type Player = { id: string; nickname: string; ra?: string; avatar: number; score: number; connected?: boolean }
 type PublicQuestion = {
   id: string
   type?: 'multiple_choice' | 'essay'
@@ -50,7 +52,7 @@ const COLORS = ['#e21b3c', '#1368ce', '#d89e00', '#26890c']
 export default function HostPage() {
   const { pin } = useParams()
   const { teacher, loading } = useAuth()
-  const { connect, send, on, onOpen, connected } = useGameSocket()
+  const { connect, send, on, onOpen, connected, disconnect } = useGameSocket()
   const [phase, setPhase] = useState('lobby')
   const [players, setPlayers] = useState<Player[]>([])
   const [question, setQuestion] = useState<PublicQuestion | null>(null)
@@ -65,10 +67,20 @@ export default function HostPage() {
   const [hosted, setHosted] = useState(false)
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
   const [grades, setGrades] = useState<GradeRow[]>([])
-  const pendingAction = useRef<'start' | 'next' | null>(null)
+  const [roomMissing, setRoomMissing] = useState(false)
+  const [playUrl, setPlayUrl] = useState(`${window.location.origin}/play`)
+  const pendingAction = useRef<'start' | 'next' | 'end' | null>(null)
+  const roomMissingRef = useRef(false)
 
   const remaining = useCountdown(endsAt)
   const teacherId = teacher?.id
+
+  useEffect(() => {
+    api
+      .health()
+      .then((h) => setPlayUrl(buildPlayUrl(h.lanIP)))
+      .catch(() => setPlayUrl(buildPlayUrl()))
+  }, [])
 
   useEffect(() => {
     if (autoNextIn == null || autoNextIn <= 0) return
@@ -100,6 +112,8 @@ export default function HostPage() {
           grades?: GradeRow[]
         }
         setHosted(true)
+        setRoomMissing(false)
+        roomMissingRef.current = false
         setError('')
         setPhase(d.phase)
         setPlayers(d.players || [])
@@ -161,22 +175,30 @@ export default function HostPage() {
       on('error', (data) => {
         const msg = (data as { message: string }).message
         setError(msg)
+        if (/sala não encontrada|room not found/i.test(msg)) {
+          roomMissingRef.current = true
+          setRoomMissing(true)
+          setHosted(false)
+          disconnect()
+          return
+        }
         if (/host/i.test(msg)) {
           setHosted(false)
-          if (!pendingAction.current) pendingAction.current = 'start'
           send('host_join', { pin, teacherId })
         }
       }),
       onOpen(() => {
+        if (roomMissingRef.current) return
         setHosted(false)
         send('host_join', { pin, teacherId })
       }),
     ]
 
     return () => offs.forEach((off) => off())
-  }, [teacherId, pin, connect, on, onOpen, send])
+  }, [teacherId, pin, connect, disconnect, on, onOpen, send])
 
-  function runHostAction(action: 'start' | 'next') {
+  function runHostAction(action: 'start' | 'next' | 'end') {
+    if (roomMissingRef.current) return
     setError('')
     if (!hosted || !connected) {
       pendingAction.current = action
@@ -186,6 +208,8 @@ export default function HostPage() {
     pendingAction.current = null
     send(action)
   }
+
+  const connectedCount = players.filter((p) => p.connected !== false).length
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
 
@@ -204,32 +228,59 @@ export default function HostPage() {
         </div>
       </header>
 
-      {error && <p className="error banner">{error}</p>}
-      {!hosted && phase === 'lobby' && (
+      {roomMissing && (
+        <section className="host-lobby">
+          <p className="error banner">
+            Esta sala (PIN {pin}) não existe mais. Isso acontece se o servidor reiniciar. Volte e clique em
+            <strong> Ao vivo</strong> para gerar um PIN novo.
+          </p>
+          <Link className="btn btn-primary btn-xl" to="/teacher">
+            Gerar novo PIN
+          </Link>
+        </section>
+      )}
+
+      {error && !roomMissing && <p className="error banner">{error}</p>}
+      {!hosted && !roomMissing && phase === 'lobby' && (
         <p className="muted banner">Conectando como host...</p>
       )}
 
-      {phase === 'lobby' && (
+      {phase === 'lobby' && !roomMissing && (
         <section className="host-lobby">
-          <p className="lede">Alunos entram em /play com PIN, RA e apelido</p>
+          <p className="lede">Peça aos alunos para abrir este link no celular:</p>
+          <div className="join-url-box">
+            <strong>{playUrl}</strong>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => navigator.clipboard.writeText(playUrl).catch(() => {})}
+            >
+              Copiar link
+            </button>
+          </div>
+          <p className="muted">Depois entram com o PIN <strong>{pin}</strong>, RA e apelido.</p>
           <div className="player-grid">
             {players.map((p) => (
-              <div key={p.id} className="player-chip">
+              <div key={p.id} className={`player-chip ${p.connected === false ? 'offline' : ''}`}>
                 <span className="avatar emoji" aria-hidden="true">
                   {avatarEmoji(p.avatar)}
                 </span>
                 {p.nickname}
                 {p.ra ? <span className="muted tiny"> · RA {p.ra}</span> : null}
+                {p.connected === false ? <span className="muted tiny"> · offline</span> : null}
               </div>
             ))}
           </div>
           <button
             className="btn btn-primary btn-xl"
             onClick={() => runHostAction('start')}
-            disabled={players.length === 0 || !hosted}
+            disabled={connectedCount === 0 || !hosted}
           >
-            Iniciar partida ({players.length})
+            Iniciar partida ({connectedCount})
           </button>
+          {hosted && connectedCount === 0 && (
+            <p className="muted tiny">Quando o aluno entrar, o nome aparece aqui. Se o celular não abrir o link, use a rede Wi‑Fi da sala.</p>
+          )}
         </section>
       )}
 
@@ -242,7 +293,7 @@ export default function HostPage() {
             <span>{question.type === 'essay' ? 'Dissertativa' : 'Objetiva'}</span>
             <span>Peso {question.weight}</span>
             {phase === 'question' ? (
-              <span className="timer">{formatClock(remaining)} · {answered}/{players.length}</span>
+              <span className="timer">{formatClock(remaining)} · {answered}/{connectedCount || players.length}</span>
             ) : (
               <span>Resultado</span>
             )}
@@ -291,6 +342,12 @@ export default function HostPage() {
             </div>
           )}
 
+          {phase === 'question' && (
+            <button className="btn btn-ghost" type="button" onClick={() => runHostAction('end')}>
+              Encerrar e ver notas
+            </button>
+          )}
+
           {phase === 'reveal' && (
             <>
               <Leaderboard board={board} />
@@ -301,6 +358,9 @@ export default function HostPage() {
               </p>
               <button className="btn btn-primary btn-xl" onClick={() => runHostAction('next')}>
                 {question.index + 1 >= question.total ? 'Ver pódio agora' : 'Próxima agora'}
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => runHostAction('end')}>
+                Encerrar e ver notas
               </button>
             </>
           )}
@@ -366,6 +426,9 @@ export default function HostPage() {
           </div>
           <Link className="btn btn-primary" to="/teacher">
             Voltar
+          </Link>
+          <Link className="btn btn-ghost" to="/teacher/sessions">
+            Ver todas as notas
           </Link>
         </section>
       )}
@@ -442,9 +505,12 @@ function formatClock(totalSec: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function formatGrade(n?: number) {
-  if (n == null || Number.isNaN(n)) return '—'
-  return n.toFixed(1).replace('.', ',')
+function buildPlayUrl(lanIP?: string) {
+  const { protocol, hostname, port } = window.location
+  const host =
+    hostname === 'localhost' || hostname === '127.0.0.1' ? lanIP || hostname : hostname
+  const suffix = port ? `:${port}` : ''
+  return `${protocol}//${host}${suffix}/play`
 }
 
 function boardToGrades(board: BoardEntry[]): GradeRow[] {
@@ -459,42 +525,4 @@ function boardToGrades(board: BoardEntry[]): GradeRow[] {
     maxScore: 0,
     grade: e.grade ?? 0,
   }))
-}
-
-function csvCell(value: string | number) {
-  const s = String(value)
-  if (/[;"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
-  return s
-}
-
-function downloadGradesCsv(quizTitle: string, pin: string, grades: GradeRow[]) {
-  const header = ['RA', 'Apelido', 'Acertos', 'Total', 'XP', 'XP_max', 'Nota']
-  const lines = [
-    '# Nota = 70% acertos + 30% XP (resposta mais rapida vale mais). Some as planilhas pelo RA.',
-    `# Quiz: ${quizTitle || 'QuestArena'} | PIN: ${pin}`,
-    header.join(';'),
-    ...grades.map((g) =>
-      [
-        csvCell(g.ra),
-        csvCell(g.nickname),
-        g.correctCount,
-        g.total,
-        g.score,
-        g.maxScore,
-        formatGrade(g.grade),
-      ].join(';'),
-    ),
-  ]
-  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
-  const slug = (quizTitle || 'quiz')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `notas-${slug || 'quiz'}-PIN${pin}.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
 }
