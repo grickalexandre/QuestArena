@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -30,8 +31,10 @@ func main() {
 	)
 
 	if devMode {
-		log.Println("starting in DEV_MODE (in-memory store + local teacher auth)")
-		mem := store.NewMemoryStore()
+		dataDir := envOr("DATA_DIR", "data")
+		storePath := filepath.Join(dataDir, "store.json")
+		log.Printf("starting in DEV_MODE (file store %s + local teacher auth)", storePath)
+		mem := store.NewPersistentMemoryStore(storePath)
 		st = mem
 		v = auth.NewDevVerifier(mem)
 	} else {

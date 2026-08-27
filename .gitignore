@@ -6,3 +6,5 @@ bin/
 firebase-service-account.json
 .DS_Store
 *.log
+data/
+backend/data/

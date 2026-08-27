@@ -424,11 +424,8 @@ export default function HostPage() {
               Baixar CSV das notas
             </button>
           </div>
-          <Link className="btn btn-primary" to="/teacher">
-            Voltar
-          </Link>
-          <Link className="btn btn-ghost" to="/teacher/sessions">
-            Ver todas as notas
+          <Link className="btn btn-primary" to="/teacher/sessions">
+            Ver notas da turma
           </Link>
         </section>
       )}

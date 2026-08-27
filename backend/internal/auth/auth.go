@@ -103,6 +103,11 @@ func hashPassword(pw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func stableDevTeacherID(email string) string {
+	sum := sha256.Sum256([]byte("questarena-dev-teacher:" + email))
+	return hex.EncodeToString(sum[:16])
+}
+
 func (d *DevVerifier) DevLogin(ctx context.Context, email, password, name string) (string, *TeacherClaims, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" || password == "" {
@@ -116,7 +121,7 @@ func (d *DevVerifier) DevLogin(ctx context.Context, email, password, name string
 			name = strings.Split(email, "@")[0]
 		}
 		u = devUser{
-			ID:           uuid.NewString(),
+			ID:           stableDevTeacherID(email),
 			Email:        email,
 			Name:         name,
 			PasswordHash: hashPassword(password),

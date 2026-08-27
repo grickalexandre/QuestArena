@@ -21,8 +21,10 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=backend /server /app/server
 COPY --from=frontend /app/frontend/dist /app/static
+RUN mkdir -p /app/data
 ENV PORT=8080
 ENV STATIC_DIR=/app/static
 ENV DEV_MODE=true
+ENV DATA_DIR=/app/data
 EXPOSE 8080
 CMD ["/app/server"]

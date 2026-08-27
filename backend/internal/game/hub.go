@@ -842,9 +842,11 @@ func (r *Room) finishLocked() {
 		StartedAt:  started,
 		FinishedAt: time.Now().UTC(),
 	}
-	go func() {
-		_ = r.hub.store.SaveSession(context.Background(), rec)
-	}()
+	if err := r.hub.store.SaveSession(context.Background(), rec); err != nil {
+		log.Printf("save session pin=%s: %v", rec.PIN, err)
+	} else {
+		log.Printf("session saved pin=%s students=%d", rec.PIN, len(rec.Ranking))
+	}
 }
 
 func (r *Room) gradesPayloadLocked() []map[string]any {

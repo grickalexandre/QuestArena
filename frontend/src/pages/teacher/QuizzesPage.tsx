@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { api, type Quiz } from '../../lib/api'
+import { api, type Quiz, type SessionRecord } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { GradesList } from './GradesList'
+import { TeacherNav } from './TeacherNav'
 
 export default function QuizzesPage() {
   const { teacher, token, logout, loading } = useAuth()
   const nav = useNavigate()
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
+  const [sessions, setSessions] = useState<SessionRecord[]>([])
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -14,6 +17,10 @@ export default function QuizzesPage() {
   useEffect(() => {
     if (!token) return
     api.listQuizzes(token).then(setQuizzes).catch((e) => setError(e.message))
+    api
+      .listSessions(token)
+      .then((list) => setSessions(Array.isArray(list) ? list : []))
+      .catch(() => {})
   }, [token])
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
@@ -53,20 +60,7 @@ export default function QuizzesPage() {
 
   return (
     <div className="teacher-shell">
-      <header className="teacher-top">
-        <Link to="/" className="brand-link">
-          QuestArena
-        </Link>
-        <div className="top-actions">
-          <Link className="btn btn-ghost" to="/teacher/sessions">
-            Notas
-          </Link>
-          <span className="pill">{teacher?.name}</span>
-          <button className="btn btn-ghost" onClick={logout}>
-            Sair
-          </button>
-        </div>
-      </header>
+      <TeacherNav name={teacher?.name} current="quizzes" onLogout={logout} />
 
       <section className="panel">
         <h1>Seus quizzes</h1>
@@ -105,6 +99,22 @@ export default function QuizzesPage() {
             </div>
           </article>
         ))}
+      </section>
+
+      <section id="notas" className="panel grades-home">
+        <h1>Notas da turma</h1>
+        <p className="muted">
+          Consulte quando quiser. Cada partida encerrada fica salva aqui, com RA, acertos e nota 0–10.
+        </p>
+        <GradesList
+          sessions={sessions.slice(0, 8)}
+          emptyText="Nenhuma partida encerrada ainda. Rode um quiz ao vivo até o fim para as notas aparecerem aqui."
+        />
+        {sessions.length > 8 && (
+          <Link className="btn btn-primary" to="/teacher/sessions">
+            Ver todas as notas ({sessions.length})
+          </Link>
+        )}
       </section>
     </div>
   )

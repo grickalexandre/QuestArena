@@ -159,9 +159,14 @@ export default function QuizEditorPage() {
         <Link to="/teacher" className="brand-link">
           ← Quizzes
         </Link>
-        <button className="btn btn-accent" onClick={goLive} disabled={questions.length === 0}>
-          Iniciar ao vivo
-        </button>
+        <div className="top-actions">
+          <Link className="btn btn-ghost" to="/teacher/sessions">
+            Notas da turma
+          </Link>
+          <button className="btn btn-accent" onClick={goLive} disabled={questions.length === 0}>
+            Iniciar ao vivo
+          </button>
+        </div>
       </header>
 
       <section className="panel">
