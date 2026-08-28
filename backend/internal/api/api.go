@@ -201,6 +201,9 @@ func (s *Server) handleListQuizzes(w http.ResponseWriter, r *http.Request) {
 	if err := seed.EnsureHerancaQuiz(r.Context(), s.Store, teacher.ID); err != nil {
 		log.Printf("seed heranca quiz: %v", err)
 	}
+	if err := seed.EnsureNodeSupabaseQuiz(r.Context(), s.Store, teacher.ID); err != nil {
+		log.Printf("seed node+supabase quiz: %v", err)
+	}
 	list, err := s.Store.ListQuizzes(r.Context(), teacher.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -465,6 +468,15 @@ func validateQuestion(q *models.Question) error {
 	}
 	if q.Type == "" {
 		q.Type = models.QuestionMultipleChoice
+	}
+	q.CodeSnippet = strings.TrimRight(strings.Trim(q.CodeSnippet, "\r\n"), " \t\r\n")
+	if q.CodeSnippet == "" {
+		q.CodeLanguage = ""
+	} else {
+		if len([]rune(q.CodeSnippet)) > 6000 {
+			return &simpleError{"código muito longo (máximo 6000 caracteres)"}
+		}
+		q.CodeLanguage = models.NormalizeCodeLanguage(q.CodeLanguage)
 	}
 	switch q.Type {
 	case models.QuestionEssay:

@@ -17,6 +17,11 @@ export default function HomePage() {
             Entrar na partida
           </Link>
         </div>
+        <p className="credits">
+          Concepção e desenvolvimento: <strong>Prof. Luis Alexandre de Oliveira</strong>
+          <br />
+          Análise e Desenvolvimento de Sistemas
+        </p>
       </div>
       <div className="home-panel" aria-hidden="true">
         <div className="orb orb-a" />

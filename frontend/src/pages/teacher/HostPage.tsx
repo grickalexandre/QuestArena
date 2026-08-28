@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import CodeBlock from '../../components/CodeBlock'
 import { avatarEmoji } from '../../lib/avatars'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -12,6 +13,8 @@ type PublicQuestion = {
   type?: 'multiple_choice' | 'essay'
   text: string
   options?: string[]
+  codeSnippet?: string
+  codeLanguage?: string
   weight: number
   timeLimitSec: number
   index: number
@@ -299,6 +302,10 @@ export default function HostPage() {
             )}
           </div>
           <h2>{question.text}</h2>
+
+          {question.codeSnippet && (
+            <CodeBlock code={question.codeSnippet} language={question.codeLanguage} />
+          )}
 
           {question.type === 'essay' ? (
             <div className="host-essay">

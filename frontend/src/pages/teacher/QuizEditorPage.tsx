@@ -1,7 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import CodeBlock from '../../components/CodeBlock'
+import CodeEditor from '../../components/CodeEditor'
 import { api, type Question, type QuestionType, type Quiz } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { CODE_LANGUAGES } from '../../lib/highlight'
 
 const emptyForm = {
   type: 'multiple_choice' as QuestionType,
@@ -10,6 +13,9 @@ const emptyForm = {
   correctIndex: 0,
   expectedAnswer: '',
   similarityThreshold: 0.55,
+  hasCode: false,
+  codeSnippet: '',
+  codeLanguage: 'java',
   weight: 1,
   timeLimitMin: 1,
 }
@@ -83,6 +89,9 @@ export default function QuizEditorPage() {
       correctIndex: q.correctIndex ?? 0,
       expectedAnswer: q.expectedAnswer || '',
       similarityThreshold: q.similarityThreshold || 0.55,
+      hasCode: Boolean(q.codeSnippet),
+      codeSnippet: q.codeSnippet || '',
+      codeLanguage: q.codeLanguage || 'java',
       weight: q.weight,
       timeLimitMin: secToMin(q.timeLimitSec),
     })
@@ -94,9 +103,12 @@ export default function QuizEditorPage() {
     setError('')
 
     const minutes = Math.min(10, Math.max(1, Number(form.timeLimitMin) || 1))
+    const code = form.hasCode ? form.codeSnippet.replace(/\s+$/, '') : ''
     const payload: Partial<Question> = {
       type: form.type,
       text: form.text,
+      codeSnippet: code,
+      codeLanguage: code ? form.codeLanguage : '',
       weight: Number(form.weight) || 1,
       timeLimitSec: minutes * 60,
       order: editingId ? questions.find((q) => q.id === editingId)?.order ?? questions.length : questions.length,
@@ -216,6 +228,45 @@ export default function QuizEditorPage() {
               />
             </label>
 
+            <div className="code-switch-row">
+              <label className="code-switch">
+                <input
+                  type="checkbox"
+                  checked={form.hasCode}
+                  onChange={(e) => setForm({ ...form, hasCode: e.target.checked })}
+                />
+                Anexar código de programação
+              </label>
+              {form.hasCode && (
+                <select
+                  value={form.codeLanguage}
+                  aria-label="Linguagem do código"
+                  onChange={(e) => setForm({ ...form, codeLanguage: e.target.value })}
+                >
+                  {CODE_LANGUAGES.map((lang) => (
+                    <option key={lang.id} value={lang.id}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {form.hasCode && (
+              <div className="code-field">
+                <CodeEditor
+                  value={form.codeSnippet}
+                  language={form.codeLanguage}
+                  onChange={(codeSnippet) => setForm({ ...form, codeSnippet })}
+                  placeholder={'Cole ou digite o código aqui...'}
+                />
+                <p className="muted tiny">
+                  Indentação preservada. Tab indenta, Shift+Tab remove. O aluno vê o código
+                  colorido, com numeração de linhas e botão de copiar.
+                </p>
+              </div>
+            )}
+
             {form.type === 'multiple_choice' ? (
               <div className="option-editor-list">
                 {form.options.map((opt, i) => (
@@ -334,6 +385,14 @@ export default function QuizEditorPage() {
                       ? ` · limiar ${Math.round((q.similarityThreshold || 0.55) * 100)}%`
                       : ` · correta: ${q.options?.[q.correctIndex] ?? '—'}`}
                   </p>
+                  {q.codeSnippet && (
+                    <CodeBlock
+                      code={q.codeSnippet}
+                      language={q.codeLanguage}
+                      copyable={false}
+                      compact
+                    />
+                  )}
                 </div>
                 <div className="row-actions">
                   <button className="btn btn-ghost" onClick={() => startEdit(q)}>

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type QuestionType string
 
@@ -34,6 +37,8 @@ type Question struct {
 	CorrectIndex        int          `json:"correctIndex" firestore:"correctIndex"`
 	ExpectedAnswer      string       `json:"expectedAnswer" firestore:"expectedAnswer"`
 	SimilarityThreshold float64      `json:"similarityThreshold" firestore:"similarityThreshold"`
+	CodeSnippet         string       `json:"codeSnippet" firestore:"codeSnippet"`
+	CodeLanguage        string       `json:"codeLanguage" firestore:"codeLanguage"`
 	Weight              float64      `json:"weight" firestore:"weight"`
 	TimeLimitSec        int          `json:"timeLimitSec" firestore:"timeLimitSec"`
 	Order               int          `json:"order" firestore:"order"`
@@ -46,10 +51,43 @@ type PublicQuestion struct {
 	Type         QuestionType `json:"type"`
 	Text         string       `json:"text"`
 	Options      []string     `json:"options,omitempty"`
+	CodeSnippet  string       `json:"codeSnippet,omitempty"`
+	CodeLanguage string       `json:"codeLanguage,omitempty"`
 	Weight       float64      `json:"weight"`
 	TimeLimitSec int          `json:"timeLimitSec"`
 	Index        int          `json:"index"`
 	Total        int          `json:"total"`
+}
+
+// CodeLanguages lists the syntax highlighting modes accepted for question snippets.
+var CodeLanguages = []string{
+	"plain", "java", "python", "javascript", "typescript", "csharp",
+	"c", "cpp", "go", "php", "sql", "kotlin", "html", "css", "json", "shell",
+}
+
+// NormalizeCodeLanguage falls back to "plain" for unknown identifiers.
+func NormalizeCodeLanguage(lang string) string {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	switch lang {
+	case "js":
+		lang = "javascript"
+	case "ts":
+		lang = "typescript"
+	case "c#", "cs":
+		lang = "csharp"
+	case "c++":
+		lang = "cpp"
+	case "py":
+		lang = "python"
+	case "bash", "sh":
+		lang = "shell"
+	}
+	for _, l := range CodeLanguages {
+		if l == lang {
+			return lang
+		}
+	}
+	return "plain"
 }
 
 type SessionRecord struct {

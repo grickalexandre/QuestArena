@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import CodeBlock from '../../components/CodeBlock'
 import { AVATARS, avatarEmoji } from '../../lib/avatars'
 import { useGameSocket } from '../../lib/useGameSocket'
 import { Leaderboard, Podium } from '../teacher/HostPage'
@@ -11,6 +12,8 @@ type PublicQuestion = {
   type: QuestionType
   text: string
   options?: string[]
+  codeSnippet?: string
+  codeLanguage?: string
   weight: number
   timeLimitSec: number
   index: number
@@ -427,6 +430,10 @@ export default function PlayPage() {
           </div>
 
           <h2>{question.text}</h2>
+
+          {question.codeSnippet && (
+            <CodeBlock code={question.codeSnippet} language={question.codeLanguage} />
+          )}
 
           {phase === 'question' && !isEssay && (
             <div className="options-grid play-opts">

@@ -22,6 +22,8 @@ export type Question = {
   correctIndex: number
   expectedAnswer?: string
   similarityThreshold?: number
+  codeSnippet?: string
+  codeLanguage?: string
   weight: number
   timeLimitSec: number
   order: number

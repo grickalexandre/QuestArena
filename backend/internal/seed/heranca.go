@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/questarena/questarena/internal/models"
 	"github.com/questarena/questarena/internal/store"
 )
 
@@ -12,76 +11,20 @@ const (
 	herancaQuizPrefix = "seed-heranca-conta-"
 	herancaTitle      = "Quest 3 — Item, Animal e Conta Corrente"
 	herancaDesc       = "15 questões de 1 minuto: da herança à conta corrente (virtual/override, abstract, Animal e cheque especial)."
-	timeLimitOneMin   = 60
 )
 
-type draftQuestion struct {
-	text         string
-	options      []string
-	correctIndex int
-}
-
-func herancaQuizID(teacherID string) string {
-	return herancaQuizPrefix + teacherID
+func herancaPack() pack {
+	return pack{
+		idPrefix:  herancaQuizPrefix,
+		title:     herancaTitle,
+		desc:      herancaDesc,
+		questions: herancaQuestions(),
+	}
 }
 
 // EnsureHerancaQuiz cria o quiz da aula (até Conta Corrente) se o professor ainda não o tiver.
 func EnsureHerancaQuiz(ctx context.Context, st store.Store, teacherID string) error {
-	if teacherID == "" {
-		return nil
-	}
-	id := herancaQuizID(teacherID)
-	existing, err := st.GetQuiz(ctx, id)
-	if err != nil || existing == nil {
-		q := &models.Quiz{
-			ID:          id,
-			TeacherID:   teacherID,
-			Title:       herancaTitle,
-			Description: herancaDesc,
-		}
-		if err := st.CreateQuiz(ctx, q); err != nil {
-			return err
-		}
-	} else if existing.Title != herancaTitle || existing.Description != herancaDesc {
-		existing.Title = herancaTitle
-		existing.Description = herancaDesc
-		if err := st.UpdateQuiz(ctx, existing); err != nil {
-			return err
-		}
-	}
-	qs, err := st.ListQuestions(ctx, id)
-	if err != nil {
-		return err
-	}
-	if len(qs) >= len(herancaQuestions()) {
-		return nil
-	}
-	for i, d := range herancaQuestions() {
-		already := false
-		for _, q := range qs {
-			if q.Order == i {
-				already = true
-				break
-			}
-		}
-		if already {
-			continue
-		}
-		item := &models.Question{
-			QuizID:       id,
-			Type:         models.QuestionMultipleChoice,
-			Text:         d.text,
-			Options:      append([]string{}, d.options...),
-			CorrectIndex: d.correctIndex,
-			Weight:       1,
-			TimeLimitSec: timeLimitOneMin,
-			Order:        i,
-		}
-		if err := st.CreateQuestion(ctx, item); err != nil {
-			return err
-		}
-	}
-	return nil
+	return herancaPack().ensure(ctx, st, teacherID)
 }
 
 func herancaQuestions() []draftQuestion {
