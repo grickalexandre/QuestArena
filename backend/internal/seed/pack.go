@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"slices"
 
 	"github.com/questarena/questarena/internal/models"
 	"github.com/questarena/questarena/internal/store"
@@ -15,6 +16,35 @@ type draftQuestion struct {
 	correctIndex int
 	code         string
 	codeLanguage string
+}
+
+func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
+	q := &models.Question{
+		QuizID:       quizID,
+		Type:         models.QuestionMultipleChoice,
+		Text:         d.text,
+		Options:      append([]string{}, d.options...),
+		CorrectIndex: d.correctIndex,
+		CodeSnippet:  d.code,
+		Weight:       1,
+		TimeLimitSec: timeLimitOneMin,
+		Order:        order,
+	}
+	if d.code != "" {
+		q.CodeLanguage = models.NormalizeCodeLanguage(d.codeLanguage)
+	}
+	return q
+}
+
+func sameContent(a, b *models.Question) bool {
+	return a.Type == b.Type &&
+		a.Text == b.Text &&
+		a.CorrectIndex == b.CorrectIndex &&
+		a.CodeSnippet == b.CodeSnippet &&
+		a.CodeLanguage == b.CodeLanguage &&
+		a.Weight == b.Weight &&
+		a.TimeLimitSec == b.TimeLimitSec &&
+		slices.Equal(a.Options, b.Options)
 }
 
 // pack is a fixed quiz that every teacher receives automatically on first access.
@@ -56,35 +86,28 @@ func (p pack) ensure(ctx context.Context, st store.Store, teacherID string) erro
 	if err != nil {
 		return err
 	}
-	if len(qs) >= len(p.questions) {
-		return nil
-	}
-	for i, d := range p.questions {
-		already := false
-		for _, q := range qs {
-			if q.Order == i {
-				already = true
-				break
-			}
+	current := make(map[int]models.Question, len(qs))
+	for _, q := range qs {
+		if _, taken := current[q.Order]; !taken {
+			current[q.Order] = q
 		}
-		if already {
+	}
+	// Questions the teacher added after the seeded ones keep their own order and
+	// are never touched here.
+	for i, d := range p.questions {
+		want := d.toQuestion(id, i)
+		saved, ok := current[i]
+		if !ok {
+			if err := st.CreateQuestion(ctx, want); err != nil {
+				return err
+			}
 			continue
 		}
-		item := &models.Question{
-			QuizID:       id,
-			Type:         models.QuestionMultipleChoice,
-			Text:         d.text,
-			Options:      append([]string{}, d.options...),
-			CorrectIndex: d.correctIndex,
-			CodeSnippet:  d.code,
-			Weight:       1,
-			TimeLimitSec: timeLimitOneMin,
-			Order:        i,
+		if sameContent(&saved, want) {
+			continue
 		}
-		if d.code != "" {
-			item.CodeLanguage = models.NormalizeCodeLanguage(d.codeLanguage)
-		}
-		if err := st.CreateQuestion(ctx, item); err != nil {
+		want.ID = saved.ID
+		if err := st.UpdateQuestion(ctx, want); err != nil {
 			return err
 		}
 	}

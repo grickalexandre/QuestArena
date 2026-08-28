@@ -45,3 +45,49 @@ func TestEnsureNodeSupabaseQuizIsIdempotent(t *testing.T) {
 		}
 	}
 }
+
+func TestEnsureRewritesOutdatedQuestions(t *testing.T) {
+	ctx := context.Background()
+	st := store.NewMemoryStore()
+	const teacherID = "teacher-2"
+
+	if err := EnsureNodeSupabaseQuiz(ctx, st, teacherID); err != nil {
+		t.Fatalf("first ensure: %v", err)
+	}
+	quizID := nodeSupabasePack().quizID(teacherID)
+	qs, err := st.ListQuestions(ctx, quizID)
+	if err != nil {
+		t.Fatalf("list questions: %v", err)
+	}
+
+	stale := qs[6]
+	stale.Text = "pergunta antiga"
+	stale.Options = []string{"a", "b", "c", "d"}
+	if err := st.UpdateQuestion(ctx, &stale); err != nil {
+		t.Fatalf("update question: %v", err)
+	}
+
+	if err := EnsureNodeSupabaseQuiz(ctx, st, teacherID); err != nil {
+		t.Fatalf("second ensure: %v", err)
+	}
+
+	qs, err = st.ListQuestions(ctx, quizID)
+	if err != nil {
+		t.Fatalf("list questions after ensure: %v", err)
+	}
+	if len(qs) != 15 {
+		t.Fatalf("want 15 questions, got %d", len(qs))
+	}
+	want := nodeSupabaseQuestions()[6]
+	for _, q := range qs {
+		if q.Order != 6 {
+			continue
+		}
+		if q.Text != want.text {
+			t.Errorf("question 7 not restored: got %q", q.Text)
+		}
+		if q.ID != stale.ID {
+			t.Errorf("question 7 should keep its id %q, got %q", stale.ID, q.ID)
+		}
+	}
+}

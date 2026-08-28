@@ -112,19 +112,16 @@ create policy "alunos_select_anon" on alunos
 			correctIndex: 3,
 		},
 		{
-			text: "O que o console.log abaixo imprime?",
-			code: `function buscar() {
-  const resultado = supabase.from('alunos').select('*');
-  console.log(resultado);
-}`,
+			text: "Para que serve a palavra await na linha abaixo?",
+			code: `const { data, error } = await supabase.from('alunos').select('*');`,
 			codeLanguage: "javascript",
 			options: []string{
-				"A lista de alunos cadastrados na tabela",
-				"Uma Promise pendente, e não os dados",
-				"null, porque a tabela ainda está vazia",
-				"Um erro de sintaxe, porque falta o await",
+				"Espera a resposta do banco chegar antes de seguir para a próxima linha",
+				"Faz a consulta rodar mais rápido dentro do Supabase",
+				"Converte o resultado da consulta em texto",
+				"Cancela a consulta se ela demorar demais",
 			},
-			correctIndex: 1,
+			correctIndex: 0,
 		},
 		{
 			text: "Para que serve o .single() no final da consulta?",
@@ -148,23 +145,12 @@ create policy "alunos_select_anon" on alunos
 			correctIndex: 0,
 		},
 		{
-			text: "Por que essa busca usa .maybeSingle() em vez de .single()?",
-			code: `async function buscarPorRa(ra) {
-  const { data, error } = await supabase
-    .from('alunos')
-    .select('*')
-    .eq('ra', ra)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}`,
-			codeLanguage: "javascript",
+			text: "Qual método do supabase-js faz o mesmo papel que o SELECT do SQL?",
 			options: []string{
-				"Porque é mais rápido quando a tabela tem muitas linhas",
-				"Porque .single() só pode ser usado depois de um insert",
-				"Porque aceita 0 ou 1 resultado sem lançar erro quando o RA não existe",
-				"Porque .maybeSingle() devolve sempre um array, mesmo vazio",
+				".insert([{ nome, ra }])",
+				".update({ curso })",
+				".select('*')",
+				".delete()",
 			},
 			correctIndex: 2,
 		},
@@ -211,23 +197,19 @@ create policy "alunos_select_anon" on alunos
 			correctIndex: 3,
 		},
 		{
-			text: "O que acontece no POST se a linha app.use(express.json()) for removida?",
-			code: `const app = express();
-
-app.use(express.json());
-
-app.post('/alunos', async (req, res) => {
-  const { nome, ra, curso } = req.body;
-  // ...
-});`,
+			text: "Entre as rotas da API, qual delas cadastra um aluno novo?",
+			code: `app.get('/alunos', listar);
+app.post('/alunos', criar);
+app.put('/alunos/:ra', alterar);
+app.delete('/alunos/:ra', apagar);`,
 			codeLanguage: "javascript",
 			options: []string{
-				"req.body chega undefined, porque ninguém interpretou o JSON recebido",
-				"O servidor não inicia e o terminal mostra erro na porta",
-				"As rotas GET também param de responder",
-				"O Express converte o body em texto e o código segue funcionando",
+				"GET /alunos",
+				"POST /alunos",
+				"PUT /alunos/:ra",
+				"DELETE /alunos/:ra",
 			},
-			correctIndex: 0,
+			correctIndex: 1,
 		},
 		{
 			text: "Na rota abaixo, o que é o :ra e de onde vem o 404?",
@@ -250,18 +232,19 @@ app.post('/alunos', async (req, res) => {
 			correctIndex: 1,
 		},
 		{
-			text: "Sobre o arquivo .env do projeto, qual atitude está correta?",
-			code: `SUPABASE_URL=https://SEU_CODIGO.supabase.co
-SUPABASE_ANON_KEY=cole_aqui_a_chave_anon_inteira
-PORT=3000`,
-			codeLanguage: "shell",
+			text: "Pela convenção dos códigos HTTP usada na API, o que significa cada faixa de número?",
+			code: `res.status(201).json(aluno);                    // POST criou o aluno
+res.status(400).json({ erro: 'faltou nome/ra' }); // pedido incompleto
+res.status(404).json({ erro: 'nao encontrado' }); // RA inexistente
+res.status(500).json({ erro: e.message });        // falha no servidor`,
+			codeLanguage: "javascript",
 			options: []string{
-				"Fazer commit do .env para o time inteiro ter as chaves",
-				"Usar a chave service_role no front-end para evitar bloqueios de RLS",
-				"Nunca versionar o .env no Git e nunca usar a service_role no front-end",
-				"Colar as chaves direto no supabase.js e apagar o .env",
+				"2xx deu certo, 4xx a culpa é de quem fez o pedido e 5xx a culpa é do servidor",
+				"2xx deu certo, 4xx a culpa é do servidor e 5xx a culpa é de quem fez o pedido",
+				"Todo código indica erro: quando dá certo, a API não devolve código nenhum",
+				"Os números são livres: cada API escolhe o que quiser para cada situação",
 			},
-			correctIndex: 2,
+			correctIndex: 0,
 		},
 		{
 			text: "Para que serve o -ContentType 'application/json' neste teste?",
