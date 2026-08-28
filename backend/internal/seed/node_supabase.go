@@ -112,8 +112,8 @@ create policy "alunos_select_anon" on alunos
 			correctIndex: 3,
 		},
 		{
-			text: "Para que serve a palavra await na linha abaixo?",
-			code: `const { data, error } = await supabase.from('alunos').select('*');`,
+			text:         "Para que serve a palavra await na linha abaixo?",
+			code:         `const { data, error } = await supabase.from('alunos').select('*');`,
 			codeLanguage: "javascript",
 			options: []string{
 				"Espera a resposta do banco chegar antes de seguir para a próxima linha",
@@ -232,23 +232,20 @@ app.delete('/alunos/:ra', apagar);`,
 			correctIndex: 1,
 		},
 		{
-			text: "Pela convenção dos códigos HTTP usada na API, o que significa cada faixa de número?",
-			code: `res.status(201).json(aluno);                    // POST criou o aluno
-res.status(400).json({ erro: 'faltou nome/ra' }); // pedido incompleto
-res.status(404).json({ erro: 'nao encontrado' }); // RA inexistente
-res.status(500).json({ erro: e.message });        // falha no servidor`,
+			text:         "Depois de um POST, a API respondeu com o código 201. O que isso quer dizer?",
+			code:         `res.status(201).json(aluno);`,
 			codeLanguage: "javascript",
 			options: []string{
-				"2xx deu certo, 4xx a culpa é de quem fez o pedido e 5xx a culpa é do servidor",
-				"2xx deu certo, 4xx a culpa é do servidor e 5xx a culpa é de quem fez o pedido",
-				"Todo código indica erro: quando dá certo, a API não devolve código nenhum",
-				"Os números são livres: cada API escolhe o que quiser para cada situação",
+				"Que o aluno foi criado com sucesso",
+				"Que faltou preencher um campo obrigatório",
+				"Que o RA informado não foi encontrado",
+				"Que algo quebrou dentro do servidor",
 			},
 			correctIndex: 0,
 		},
 		{
-			text: "Para que serve o -ContentType 'application/json' neste teste?",
-			code: `Invoke-RestMethod -Method Post -Uri http://localhost:3000/alunos -ContentType 'application/json' -Body '{"nome":"João Souza","ra":"2026002","curso":"ADS"}'`,
+			text:         "Para que serve o -ContentType 'application/json' neste teste?",
+			code:         `Invoke-RestMethod -Method Post -Uri http://localhost:3000/alunos -ContentType 'application/json' -Body '{"nome":"João Souza","ra":"2026002","curso":"ADS"}'`,
 			codeLanguage: "shell",
 			options: []string{
 				"Avisa o servidor que o corpo é JSON, para o express.json() conseguir interpretá-lo",
