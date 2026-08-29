@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import Credits from '../../components/Credits'
 import { useAuth } from '../../lib/auth'
 
 export default function TeacherLoginPage() {
@@ -78,6 +79,7 @@ export default function TeacherLoginPage() {
         >
           {mode === 'login' ? 'Criar nova conta' : 'Já tenho conta'}
         </button>
+        <Credits compact />
       </form>
     </div>
   )

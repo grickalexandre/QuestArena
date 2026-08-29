@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
 import { avatarEmoji } from '../../lib/avatars'
 import { api } from '../../lib/api'
@@ -7,7 +8,17 @@ import { useAuth } from '../../lib/auth'
 import { downloadGradesCsv, formatGrade } from '../../lib/gradesCsv'
 import { useGameSocket } from '../../lib/useGameSocket'
 
-type Player = { id: string; nickname: string; ra?: string; avatar: number; score: number; connected?: boolean }
+type Player = {
+  id: string
+  nickname: string
+  ra?: string
+  avatar: number
+  score: number
+  connected?: boolean
+  hidden?: boolean
+  awayCount?: number
+  awayTotal?: number
+}
 type PublicQuestion = {
   id: string
   type?: 'multiple_choice' | 'essay'
@@ -139,8 +150,9 @@ export default function HostPage() {
       }),
       on('player_joined', (data) => setPlayers((data as { players: Player[] }).players)),
       on('player_left', (data) => setPlayers((data as { players: Player[] }).players)),
+      on('player_presence', (data) => setPlayers((data as { players: Player[] }).players)),
       on('question', (data) => {
-        const d = data as { question: PublicQuestion; endsAt: string }
+        const d = data as { question: PublicQuestion; endsAt: string; players?: Player[] }
         setPhase('question')
         setQuestion(d.question)
         setEndsAt(new Date(d.endsAt).getTime())
@@ -150,6 +162,8 @@ export default function HostPage() {
         setAnswered(0)
         setAutoNextIn(null)
         setError('')
+        if (d.players) setPlayers(d.players)
+        else setPlayers((prev) => prev.map((p) => ({ ...p, awayCount: 0 })))
       }),
       on('answer_count', (data) => setAnswered((data as { answered: number }).answered)),
       on('question_result', (data) => {
@@ -213,6 +227,8 @@ export default function HostPage() {
   }
 
   const connectedCount = players.filter((p) => p.connected !== false).length
+  const awayNow = players.filter((p) => p.hidden || p.connected === false)
+  const flagged = players.filter((p) => (p.awayCount || 0) > 0)
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
 
@@ -264,13 +280,13 @@ export default function HostPage() {
           <p className="muted">Depois entram com o PIN <strong>{pin}</strong>, RA e apelido.</p>
           <div className="player-grid">
             {players.map((p) => (
-              <div key={p.id} className={`player-chip ${p.connected === false ? 'offline' : ''}`}>
+              <div key={p.id} className={playerChipClass(p)}>
                 <span className="avatar emoji" aria-hidden="true">
                   {avatarEmoji(p.avatar)}
                 </span>
                 {p.nickname}
                 {p.ra ? <span className="muted tiny"> · RA {p.ra}</span> : null}
-                {p.connected === false ? <span className="muted tiny"> · offline</span> : null}
+                {playerChipNote(p)}
               </div>
             ))}
           </div>
@@ -350,9 +366,12 @@ export default function HostPage() {
           )}
 
           {phase === 'question' && (
-            <button className="btn btn-ghost" type="button" onClick={() => runHostAction('end')}>
-              Encerrar e ver notas
-            </button>
+            <>
+              <PresencePanel players={players} awayNow={awayNow} flagged={flagged} />
+              <button className="btn btn-ghost" type="button" onClick={() => runHostAction('end')}>
+                Encerrar e ver notas
+              </button>
+            </>
           )}
 
           {phase === 'reveal' && (
@@ -436,6 +455,70 @@ export default function HostPage() {
           </Link>
         </section>
       )}
+      <Credits compact />
+    </div>
+  )
+}
+
+function playerChipClass(p: Player) {
+  const parts = ['player-chip']
+  if (p.connected === false) parts.push('offline')
+  if (p.hidden || p.connected === false) parts.push('away')
+  else if ((p.awayCount || 0) > 0) parts.push('flagged')
+  return parts.join(' ')
+}
+
+function playerChipNote(p: Player) {
+  if (p.connected === false) {
+    return <span className="muted tiny"> · offline</span>
+  }
+  if (p.hidden) {
+    return <span className="away-note"> · fora da tela</span>
+  }
+  if ((p.awayCount || 0) > 0) {
+    return <span className="flag-note"> · saiu {p.awayCount}x</span>
+  }
+  return null
+}
+
+function PresencePanel({
+  players,
+  awayNow,
+  flagged,
+}: {
+  players: Player[]
+  awayNow: Player[]
+  flagged: Player[]
+}) {
+  if (players.length === 0) return null
+  return (
+    <div className="presence-panel">
+      {awayNow.length > 0 ? (
+        <p className="away-banner">
+          {awayNow.length === 1
+            ? `${awayNow[0].nickname} saiu da tela agora`
+            : `${awayNow.length} alunos saíram da tela agora`}
+        </p>
+      ) : flagged.length > 0 ? (
+        <p className="flag-banner">
+          {flagged.length === 1
+            ? `${flagged[0].nickname} saiu da tela nesta questão`
+            : `${flagged.length} alunos já saíram da tela nesta questão`}
+        </p>
+      ) : (
+        <p className="muted tiny">Ninguém saiu da tela nesta questão.</p>
+      )}
+      <div className="player-grid compact">
+        {players.map((p) => (
+          <div key={p.id} className={playerChipClass(p)}>
+            <span className="avatar emoji" aria-hidden="true">
+              {avatarEmoji(p.avatar)}
+            </span>
+            {p.nickname}
+            {playerChipNote(p)}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
 import CodeEditor from '../../components/CodeEditor'
 import { api, type Question, type QuestionType, type Quiz } from '../../lib/api'
@@ -270,9 +271,8 @@ export default function QuizEditorPage() {
             {form.type === 'multiple_choice' ? (
               <div className="option-editor-list">
                 {form.options.map((opt, i) => (
-                  <button
+                  <div
                     key={i}
-                    type="button"
                     className={`option-editor ${form.correctIndex === i ? 'is-correct' : ''}`}
                     style={{ ['--opt' as string]: OPTION_COLORS[i] }}
                     onClick={() => setForm({ ...form, correctIndex: i })}
@@ -280,7 +280,7 @@ export default function QuizEditorPage() {
                     <span className="option-editor-letter">{String.fromCharCode(65 + i)}</span>
                     <textarea
                       value={opt}
-                      rows={3}
+                      rows={4}
                       placeholder={`Alternativa ${String.fromCharCode(65 + i)}`}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
@@ -292,7 +292,7 @@ export default function QuizEditorPage() {
                     <span className="option-editor-mark">
                       {form.correctIndex === i ? 'Correta' : 'Marcar'}
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -408,6 +408,7 @@ export default function QuizEditorPage() {
           {quiz && <p className="muted tiny">ID: {quiz.id}</p>}
         </section>
       </div>
+      <Credits compact />
     </div>
   )
 }

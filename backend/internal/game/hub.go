@@ -62,6 +62,9 @@ type Player struct {
 	Score        int    `json:"score"`
 	CorrectCount int    `json:"correctCount"`
 	Avatar       int    `json:"avatar"`
+	Hidden       bool   `json:"hidden"`
+	AwayCount    int    `json:"awayCount"`
+	AwayTotal    int    `json:"awayTotal"`
 	conn         *Client
 	answered     bool
 	choice       int
@@ -247,6 +250,8 @@ func (c *Client) handle(env Envelope) {
 		c.handleAnswer(env.Data)
 	case "end":
 		c.handleEnd()
+	case "presence":
+		c.handlePresence(env.Data)
 	default:
 		c.sendError("unknown event: " + env.Type)
 	}
@@ -398,6 +403,7 @@ func nickTakenByOther(room *Room, nick, exceptID string) bool {
 
 func (c *Client) attachPlayerLocked(room *Room, player *Player) {
 	player.conn = c
+	player.Hidden = false
 	c.role = RolePlayer
 	c.roomPIN = room.PIN
 	c.playerID = player.ID
@@ -421,6 +427,10 @@ func playerStatePayload(room *Room, player *Player) map[string]any {
 	if room.Phase == PhaseQuestion || room.Phase == PhaseReveal {
 		payload["question"] = publicQuestion(room)
 		payload["endsAt"] = room.Deadline.UTC().Format(time.RFC3339Nano)
+		if ans, ok := room.Answers[player.ID]; ok {
+			payload["answerText"] = ans.text
+			payload["choice"] = ans.choice
+		}
 		if room.Phase == PhaseReveal {
 			payload["questionResult"] = room.buildResultPayloadLocked()
 		}
@@ -480,6 +490,40 @@ func (c *Client) handleNext() {
 	room.startQuestionLocked()
 }
 
+func (c *Client) handlePresence(data json.RawMessage) {
+	var req struct {
+		Hidden bool `json:"hidden"`
+	}
+	if err := json.Unmarshal(data, &req); err != nil {
+		c.sendError("invalid presence")
+		return
+	}
+	if c.role != RolePlayer || c.playerID == "" {
+		return
+	}
+	room := c.hub.GetRoom(c.roomPIN)
+	if room == nil {
+		return
+	}
+	room.mu.Lock()
+	defer room.mu.Unlock()
+	player, ok := room.Players[c.playerID]
+	if !ok || player.conn != c {
+		return
+	}
+	if player.Hidden == req.Hidden {
+		return
+	}
+	player.Hidden = req.Hidden
+	if req.Hidden && room.Phase == PhaseQuestion {
+		player.AwayCount++
+		player.AwayTotal++
+	}
+	room.broadcastLocked("player_presence", map[string]any{
+		"players": publicPlayers(room),
+	})
+}
+
 func (c *Client) handleEnd() {
 	room := c.hub.GetRoom(c.roomPIN)
 	if room == nil || c.role != RoleHost || room.Host != c {
@@ -519,10 +563,6 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 	player, ok := room.Players[c.playerID]
 	if !ok {
 		c.sendError("player not found")
-		return
-	}
-	if player.answered {
-		c.sendError("já respondeu")
 		return
 	}
 	q := room.Questions[room.CurrentIndex]
@@ -571,6 +611,29 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		}
 	}
 
+	if prev, ok := room.Answers[player.ID]; ok {
+		same := prev.text == text
+		if qType != models.QuestionEssay {
+			same = prev.choice == choice
+		}
+		if same {
+			c.emit("answer_ack", map[string]any{
+				"received":   true,
+				"updated":    false,
+				"points":     prev.points,
+				"similarity": prev.similarity,
+			})
+			return
+		}
+		player.Score -= prev.points
+		if player.Score < 0 {
+			player.Score = 0
+		}
+		if prev.correct && player.CorrectCount > 0 {
+			player.CorrectCount--
+		}
+	}
+
 	player.answered = true
 	player.choice = choice
 	player.Score += points
@@ -588,6 +651,7 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 	}
 	c.emit("answer_ack", map[string]any{
 		"received":   true,
+		"updated":    true,
 		"points":     points,
 		"similarity": similarity,
 	})
@@ -597,9 +661,6 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		"answered": answered,
 		"total":    connected,
 	})
-	if connected > 0 && answered == connected {
-		room.revealLocked()
-	}
 }
 
 func calcScore(weight float64, timeLimitSec int, elapsed time.Duration) int {
@@ -645,6 +706,11 @@ func (r *Room) startQuestionLocked() {
 	for _, p := range r.Players {
 		p.answered = false
 		p.choice = -1
+		p.AwayCount = 0
+		if p.Hidden || p.conn == nil {
+			p.AwayCount++
+			p.AwayTotal++
+		}
 	}
 	q := r.Questions[r.CurrentIndex]
 	limit := q.TimeLimitSec
@@ -659,6 +725,7 @@ func (r *Room) startQuestionLocked() {
 		"question":  publicQuestion(r),
 		"startedAt": r.QuestionAt.UTC().Format(time.RFC3339Nano),
 		"endsAt":    r.Deadline.UTC().Format(time.RFC3339Nano),
+		"players":   publicPlayers(r),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -913,6 +980,9 @@ func publicPlayers(r *Room) []map[string]any {
 			"score":        p.Score,
 			"correctCount": p.CorrectCount,
 			"connected":    p.conn != nil,
+			"hidden":       p.Hidden,
+			"awayCount":    p.AwayCount,
+			"awayTotal":    p.AwayTotal,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -958,6 +1028,13 @@ func (c *Client) cleanup() {
 	if c.role == RolePlayer {
 		if p, ok := room.Players[c.playerID]; ok && p.conn == c {
 			p.conn = nil
+			if !p.Hidden {
+				p.Hidden = true
+				if room.Phase == PhaseQuestion {
+					p.AwayCount++
+					p.AwayTotal++
+				}
+			}
 			room.broadcastLocked("player_left", map[string]any{
 				"players": publicPlayers(room),
 			})

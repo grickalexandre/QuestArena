@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
 import { AVATARS, avatarEmoji } from '../../lib/avatars'
 import { useGameSocket } from '../../lib/useGameSocket'
+import { usePlayPresence } from '../../lib/usePlayPresence'
 import { Leaderboard, Podium } from '../teacher/HostPage'
 
 type QuestionType = 'multiple_choice' | 'essay'
@@ -57,6 +59,7 @@ type JoinedPayload = {
   phase?: 'lobby' | 'question' | 'reveal' | 'finished'
   answered?: boolean
   choice?: number
+  answerText?: string
   question?: PublicQuestion
   endsAt?: string
   questionResult?: QuestionResult
@@ -119,6 +122,8 @@ export default function PlayPage() {
   const [error, setError] = useState('')
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
+  const [leftThisQuestion, setLeftThisQuestion] = useState(false)
+  const away = usePlayPresence(send, phase !== 'join')
   const remaining = useCountdown(endsAt)
   const timerPct = useMemo(() => {
     if (!question || !endsAt) return 0
@@ -136,15 +141,25 @@ export default function PlayPage() {
     return () => clearTimeout(id)
   }, [autoNextIn])
 
-  function applyQuestion(q: PublicQuestion, endsAtIso?: string, alreadyAnswered?: boolean, choice?: number) {
+  useEffect(() => {
+    if (phase === 'question' && away) setLeftThisQuestion(true)
+  }, [phase, away])
+
+  function applyQuestion(
+    q: PublicQuestion,
+    endsAtIso?: string,
+    alreadyAnswered?: boolean,
+    choice?: number,
+    answerText?: string,
+  ) {
     setQuestion({
       ...q,
       type: q.type || 'multiple_choice',
     })
     setEndsAt(endsAtIso ? new Date(endsAtIso).getTime() : null)
     setSelected(typeof choice === 'number' && choice >= 0 ? choice : null)
-    setEssayDraft('')
-    setSubmittedText('')
+    setEssayDraft(answerText || '')
+    setSubmittedText(answerText || '')
     setLocked(!!alreadyAnswered)
     setCorrectIndex(null)
     setExpectedAnswer('')
@@ -152,6 +167,7 @@ export default function PlayPage() {
     setLastSimilarity(null)
     setLastCorrect(null)
     setAutoNextIn(null)
+    setLeftThisQuestion(false)
   }
 
   function applyResult(d: QuestionResult, id: string) {
@@ -203,7 +219,7 @@ export default function PlayPage() {
         const nextPhase = d.phase || 'lobby'
         if (nextPhase === 'question' && d.question) {
           setPhase('question')
-          applyQuestion(d.question, d.endsAt, d.answered, d.choice)
+          applyQuestion(d.question, d.endsAt, d.answered, d.choice, d.answerText)
         } else if (nextPhase === 'reveal' && d.question) {
           applyQuestion(d.question, d.endsAt, true, d.choice)
           if (d.questionResult) applyResult(d.questionResult, d.playerId)
@@ -293,7 +309,8 @@ export default function PlayPage() {
   }
 
   function answerChoice(choice: number) {
-    if (locked || phase !== 'question') return
+    if (phase !== 'question') return
+    if (locked && selected === choice) return
     setSelected(choice)
     setError('')
     send('answer', { choice })
@@ -301,12 +318,13 @@ export default function PlayPage() {
 
   function submitEssay(e?: FormEvent) {
     e?.preventDefault()
-    if (locked || phase !== 'question') return
+    if (phase !== 'question') return
     const text = essayDraft.trim()
     if (!text) {
       setError('Escreva sua resposta antes de enviar')
       return
     }
+    if (locked && text === submittedText.trim()) return
     setError('')
     send('answer', { text })
     setSubmittedText(text)
@@ -385,6 +403,7 @@ export default function PlayPage() {
           <button className="btn btn-accent btn-xl" type="submit">
             Entrar como {avatarEmoji(avatar)} {nickname.trim() || '...'}
           </button>
+          <Credits compact />
         </form>
       )}
 
@@ -429,6 +448,12 @@ export default function PlayPage() {
             )}
           </div>
 
+          {phase === 'question' && leftThisQuestion && (
+            <p className="error banner away-warn">
+              Você saiu da tela. O professor foi avisado.
+            </p>
+          )}
+
           <h2>{question.text}</h2>
 
           {question.codeSnippet && (
@@ -436,27 +461,33 @@ export default function PlayPage() {
           )}
 
           {phase === 'question' && !isEssay && (
-            <div className="options-grid play-opts">
-              {(question.options || []).map((opt, i) => {
-                let cls = 'opt'
-                if (selected === i) cls += ' selected'
-                return (
-                  <button
-                    key={i}
-                    className={cls}
-                    style={{ ['--opt' as string]: COLORS[i % COLORS.length] }}
-                    disabled={locked}
-                    onClick={() => answerChoice(i)}
-                  >
-                    <span className="opt-letter">{String.fromCharCode(65 + i)}</span>
-                    <span className="opt-text">{opt}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <>
+              <div className="options-grid play-opts">
+                {(question.options || []).map((opt, i) => {
+                  let cls = 'opt'
+                  if (selected === i) cls += ' selected'
+                  return (
+                    <button
+                      key={i}
+                      className={cls}
+                      style={{ ['--opt' as string]: COLORS[i % COLORS.length] }}
+                      onClick={() => answerChoice(i)}
+                    >
+                      <span className="opt-letter">{String.fromCharCode(65 + i)}</span>
+                      <span className="opt-text">{opt}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {locked ? (
+                <p className="muted tiny change-hint">Resposta salva. Clique em outra opção para trocar até o tempo acabar.</p>
+              ) : (
+                <p className="muted tiny change-hint">Pode trocar a escolha enquanto o tempo estiver rodando.</p>
+              )}
+            </>
           )}
 
-          {phase === 'question' && isEssay && !locked && (
+          {phase === 'question' && isEssay && (
             <form className="essay-box" onSubmit={submitEssay}>
               <textarea
                 value={essayDraft}
@@ -467,27 +498,18 @@ export default function PlayPage() {
               />
               <div className="essay-actions">
                 <span className="muted tiny">{essayDraft.trim().length}/2000</span>
-                <button className="btn btn-accent btn-xl" type="submit" disabled={!essayDraft.trim()}>
-                  Enviar resposta
+                <button
+                  className="btn btn-accent btn-xl"
+                  type="submit"
+                  disabled={!essayDraft.trim() || (locked && essayDraft.trim() === submittedText.trim())}
+                >
+                  {locked ? 'Atualizar resposta' : 'Enviar resposta'}
                 </button>
               </div>
+              {locked && (
+                <p className="muted tiny change-hint">Salva. Pode editar e atualizar até o tempo acabar.</p>
+              )}
             </form>
-          )}
-
-          {phase === 'question' && isEssay && locked && (
-            <div className="waiting-card">
-              <div className="pulse-ring small" />
-              <p>Resposta enviada!</p>
-              <p className="muted">Aguarde o tempo ou os demais jogadores...</p>
-              <blockquote className="sent-answer">{submittedText || essayDraft}</blockquote>
-            </div>
-          )}
-
-          {phase === 'question' && !isEssay && locked && (
-            <div className="waiting-card">
-              <div className="pulse-ring small" />
-              <p>Resposta enviada! Aguarde o resultado...</p>
-            </div>
           )}
 
           {phase === 'reveal' && (

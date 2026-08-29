@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Credits from '../components/Credits'
 
 export default function HomePage() {
   return (
@@ -17,11 +18,7 @@ export default function HomePage() {
             Entrar na partida
           </Link>
         </div>
-        <p className="credits">
-          Concepção e desenvolvimento: <strong>Prof. Luis Alexandre de Oliveira</strong>
-          <br />
-          Análise e Desenvolvimento de Sistemas
-        </p>
+        <Credits />
       </div>
       <div className="home-panel" aria-hidden="true">
         <div className="orb orb-a" />

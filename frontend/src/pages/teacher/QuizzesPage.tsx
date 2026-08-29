@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api, type Quiz, type SessionRecord } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { GradesList } from './GradesList'
+import Credits from '../../components/Credits'
 import { TeacherNav } from './TeacherNav'
 
 export default function QuizzesPage() {
@@ -116,6 +117,7 @@ export default function QuizzesPage() {
           </Link>
         )}
       </section>
+      <Credits compact />
     </div>
   )
 }

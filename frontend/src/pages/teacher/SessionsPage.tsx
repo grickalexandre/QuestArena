@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { api, type SessionRecord } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { GradesList } from './GradesList'
+import Credits from '../../components/Credits'
 import { TeacherNav } from './TeacherNav'
 
 export default function SessionsPage() {
@@ -36,6 +37,7 @@ export default function SessionsPage() {
         sessions={sessions}
         emptyText="Nenhuma partida encerrada ainda. Inicie um quiz ao vivo e termine para as notas ficarem salvas aqui."
       />
+      <Credits compact />
     </div>
   )
 }

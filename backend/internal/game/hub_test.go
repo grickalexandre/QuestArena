@@ -80,3 +80,104 @@ func TestMemoryStoreListsSessionsByTeacher(t *testing.T) {
 		t.Fatal("expected forbidden")
 	}
 }
+
+func TestPresenceCountsAwayOnlyOnQuestion(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B"}, CorrectIndex: 0, Weight: 1000, TimeLimitSec: 30,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Client{hub: h, send: make(chan []byte, 16)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	hidden, _ := json.Marshal(map[string]any{"hidden": true})
+	visible, _ := json.Marshal(map[string]any{"hidden": false})
+	c.handlePresence(hidden)
+
+	var player *Player
+	for _, p := range room.Players {
+		player = p
+	}
+	if !player.Hidden || player.AwayCount != 0 || player.AwayTotal != 0 {
+		t.Fatalf("lobby should not count away: hidden=%v count=%d total=%d", player.Hidden, player.AwayCount, player.AwayTotal)
+	}
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+	if player.AwayCount != 1 || player.AwayTotal != 1 {
+		t.Fatalf("already hidden at start: count=%d total=%d", player.AwayCount, player.AwayTotal)
+	}
+
+	c.handlePresence(visible)
+	c.handlePresence(hidden)
+	if player.AwayCount != 2 || player.AwayTotal != 2 {
+		t.Fatalf("leave during question: count=%d total=%d", player.AwayCount, player.AwayTotal)
+	}
+	c.handlePresence(hidden)
+	if player.AwayCount != 2 {
+		t.Fatalf("duplicate hidden incremented count: %d", player.AwayCount)
+	}
+	c.handlePresence(visible)
+	c.handlePresence(hidden)
+	if player.AwayCount != 3 || player.AwayTotal != 3 || !player.Hidden {
+		t.Fatalf("second leave: hidden=%v count=%d total=%d", player.Hidden, player.AwayCount, player.AwayTotal)
+	}
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+	if player.AwayCount != 1 || player.AwayTotal != 4 {
+		t.Fatalf("new question keeps hidden flag: count=%d total=%d", player.AwayCount, player.AwayTotal)
+	}
+}
+
+func TestPlayerCanChangeAnswerBeforeDeadline(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B", "C"}, CorrectIndex: 1, Weight: 1000, TimeLimitSec: 30,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Client{hub: h, send: make(chan []byte, 32)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+
+	wrong, _ := json.Marshal(map[string]any{"choice": 0})
+	c.handleAnswer(wrong)
+	p := room.Players[c.playerID]
+	if !p.answered || p.choice != 0 || p.CorrectCount != 0 || p.Score != 0 {
+		t.Fatalf("first wrong answer: %+v ans=%+v", p, room.Answers[p.ID])
+	}
+
+	c.handleAnswer(wrong)
+	if p.choice != 0 || p.Score != 0 {
+		t.Fatal("same choice should be a no-op")
+	}
+
+	right, _ := json.Marshal(map[string]any{"choice": 1})
+	c.handleAnswer(right)
+	if p.choice != 1 || p.CorrectCount != 1 || p.Score <= 0 || !room.Answers[p.ID].correct {
+		t.Fatalf("changed to correct: score=%d correctCount=%d ans=%+v", p.Score, p.CorrectCount, room.Answers[p.ID])
+	}
+
+	score := p.Score
+	c.handleAnswer(wrong)
+	if p.choice != 0 || p.CorrectCount != 0 || p.Score != 0 || score == 0 {
+		t.Fatalf("changed back to wrong: score=%d correctCount=%d", p.Score, p.CorrectCount)
+	}
+}
