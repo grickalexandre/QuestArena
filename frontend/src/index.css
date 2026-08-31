@@ -556,6 +556,19 @@ label {
   max-width: 720px;
 }
 
+.alt-accepted {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.alt-accepted li {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .essay-results {
   list-style: none;
   padding: 0;
@@ -664,6 +677,57 @@ label {
 .question-form {
   display: grid;
   gap: 0.75rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.alt-answers {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.alt-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.alt-row textarea {
+  flex: 1;
+  min-height: 3.2rem;
+}
+
+.essay-trial {
+  display: grid;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.85rem;
+}
+
+.essay-trial-result {
+  margin: 0;
+  font-weight: 700;
+}
+
+.essay-trial-result.ok {
+  color: #4ade80;
+}
+
+.essay-trial-result.ko {
+  color: #fca5a5;
+}
+
+.q-expected-preview {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .option-row {

@@ -36,6 +36,7 @@ type Question struct {
 	Options             []string     `json:"options" firestore:"options"`
 	CorrectIndex        int          `json:"correctIndex" firestore:"correctIndex"`
 	ExpectedAnswer      string       `json:"expectedAnswer" firestore:"expectedAnswer"`
+	ExpectedAnswers     []string     `json:"expectedAnswers,omitempty" firestore:"expectedAnswers,omitempty"`
 	SimilarityThreshold float64      `json:"similarityThreshold" firestore:"similarityThreshold"`
 	CodeSnippet         string       `json:"codeSnippet" firestore:"codeSnippet"`
 	CodeLanguage        string       `json:"codeLanguage" firestore:"codeLanguage"`
@@ -111,4 +112,43 @@ type RankingEntry struct {
 	MaxScore     int     `json:"maxScore" firestore:"maxScore"`
 	Grade        float64 `json:"grade" firestore:"grade"`
 	Rank         int     `json:"rank" firestore:"rank"`
+}
+
+// EssayReferences returns the primary expected answer plus unique alternatives.
+func (q Question) EssayReferences() []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, 1+len(q.ExpectedAnswers))
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		key := strings.ToLower(s)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, s)
+	}
+	add(q.ExpectedAnswer)
+	for _, a := range q.ExpectedAnswers {
+		add(a)
+	}
+	return out
+}
+
+// NormalizeEssayRefs puts the first unique reference in ExpectedAnswer and the rest in ExpectedAnswers.
+func (q *Question) NormalizeEssayRefs() {
+	refs := q.EssayReferences()
+	if len(refs) == 0 {
+		q.ExpectedAnswer = ""
+		q.ExpectedAnswers = nil
+		return
+	}
+	q.ExpectedAnswer = refs[0]
+	if len(refs) > 1 {
+		q.ExpectedAnswers = refs[1:]
+		return
+	}
+	q.ExpectedAnswers = nil
 }

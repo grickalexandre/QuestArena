@@ -21,6 +21,7 @@ export type Question = {
   options: string[]
   correctIndex: number
   expectedAnswer?: string
+  expectedAnswers?: string[]
   similarityThreshold?: number
   codeSnippet?: string
   codeLanguage?: string
@@ -119,6 +120,25 @@ export const api = {
     request<{ status: string }>(`/api/quizzes/${quizId}/questions/${qid}`, {
       method: 'DELETE',
       headers: authHeaders(token),
+    }),
+  previewSimilarity: (
+    token: string,
+    body: {
+      text: string
+      expectedAnswer: string
+      expectedAnswers?: string[]
+      threshold?: number
+    },
+  ) =>
+    request<{
+      similarity: number
+      passed: boolean
+      threshold: number
+      matches: { answer: string; similarity: number }[]
+    }>('/api/similarity', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(body),
     }),
   createSession: (token: string, quizId: string) =>
     request<{ pin: string; sessionId: string; quizId: string; quizTitle: string }>(

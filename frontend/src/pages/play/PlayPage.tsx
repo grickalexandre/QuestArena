@@ -45,6 +45,7 @@ type QuestionResult = {
   type?: QuestionType
   correctIndex: number
   expectedAnswer?: string
+  expectedAnswers?: string[]
   leaderboard: BoardEntry[]
   results: ResultEntry[]
   autoNextInSec?: number
@@ -115,6 +116,7 @@ export default function PlayPage() {
   const [locked, setLocked] = useState(false)
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [expectedAnswer, setExpectedAnswer] = useState('')
+  const [expectedAnswers, setExpectedAnswers] = useState<string[]>([])
   const [lastPoints, setLastPoints] = useState<number | null>(null)
   const [lastSimilarity, setLastSimilarity] = useState<number | null>(null)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
@@ -163,6 +165,7 @@ export default function PlayPage() {
     setLocked(!!alreadyAnswered)
     setCorrectIndex(null)
     setExpectedAnswer('')
+    setExpectedAnswers([])
     setLastPoints(null)
     setLastSimilarity(null)
     setLastCorrect(null)
@@ -174,6 +177,7 @@ export default function PlayPage() {
     setPhase('reveal')
     setCorrectIndex(d.correctIndex)
     setExpectedAnswer(d.expectedAnswer || '')
+    setExpectedAnswers(d.expectedAnswers || [])
     setBoard(d.leaderboard)
     setEndsAt(null)
     setAutoNextIn(d.autoNextInSec ?? 5)
@@ -492,7 +496,7 @@ export default function PlayPage() {
               <textarea
                 value={essayDraft}
                 onChange={(e) => setEssayDraft(e.target.value.slice(0, 2000))}
-                placeholder="Digite sua resposta com suas palavras..."
+                placeholder="Explique com suas palavras. A correção compara com a resposta de referência."
                 rows={6}
                 autoFocus
               />
@@ -526,7 +530,7 @@ export default function PlayPage() {
                     <strong>{Math.round((lastSimilarity || 0) * 100)}% similar</strong>
                   </div>
                   <p className={`result-banner ${lastCorrect ? 'ok' : 'ko'}`}>
-                    {lastCorrect ? 'Resposta aceita' : 'Abaixo do limiar'}
+                    {lastCorrect ? 'Resposta aceita' : 'Não atingiu o mínimo'}
                     {lastPoints != null ? ` · +${lastPoints} XP` : ''}
                   </p>
                   <div className="answer-compare">
@@ -537,6 +541,13 @@ export default function PlayPage() {
                     <div>
                       <span className="label">Esperada</span>
                       <p>{expectedAnswer || '—'}</p>
+                      {expectedAnswers.length > 0 && (
+                        <ul className="alt-accepted">
+                          {expectedAnswers.map((a) => (
+                            <li key={a}>{a}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
                 </>

@@ -55,6 +55,7 @@ func (s *Server) Routes() http.Handler {
 	api.HandleFunc("/sessions", s.handleCreateSession).Methods("POST", "OPTIONS")
 	api.HandleFunc("/sessions", s.handleListSessions).Methods("GET", "OPTIONS")
 	api.HandleFunc("/sessions/{id}", s.handleGetSession).Methods("GET", "OPTIONS")
+	api.HandleFunc("/similarity", s.handleSimilarity).Methods("POST", "OPTIONS")
 
 	r.HandleFunc("/ws", s.Hub.ServeWS)
 
@@ -203,6 +204,9 @@ func (s *Server) handleListQuizzes(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := seed.EnsureNodeSupabaseQuiz(r.Context(), s.Store, teacher.ID); err != nil {
 		log.Printf("seed node+supabase quiz: %v", err)
+	}
+	if err := seed.EnsureMerQuiz(r.Context(), s.Store, teacher.ID); err != nil {
+		log.Printf("seed mer quiz: %v", err)
 	}
 	list, err := s.Store.ListQuizzes(r.Context(), teacher.ID)
 	if err != nil {
@@ -444,6 +448,53 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rec)
 }
 
+func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Text            string   `json:"text"`
+		ExpectedAnswer  string   `json:"expectedAnswer"`
+		ExpectedAnswers []string `json:"expectedAnswers"`
+		Threshold       float64  `json:"threshold"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	q := models.Question{
+		ExpectedAnswer:  req.ExpectedAnswer,
+		ExpectedAnswers: req.ExpectedAnswers,
+	}
+	refs := q.EssayReferences()
+	if len(refs) == 0 {
+		writeErr(w, http.StatusBadRequest, "expectedAnswer required")
+		return
+	}
+	th := req.Threshold
+	if th <= 0 {
+		th = 0.55
+	}
+	if th > 1 {
+		th = 1
+	}
+	matches := make([]map[string]any, 0, len(refs))
+	best := 0.0
+	for _, ref := range refs {
+		sim := game.Similarity(req.Text, ref)
+		if sim > best {
+			best = sim
+		}
+		matches = append(matches, map[string]any{
+			"answer":     ref,
+			"similarity": sim,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"similarity": best,
+		"passed":     best >= th,
+		"threshold":  th,
+		"matches":    matches,
+	})
+}
+
 func (s *Server) ensureQuizOwner(r *http.Request, teacherID, quizID string) error {
 	q, err := s.Store.GetQuiz(r.Context(), quizID)
 	if err != nil {
@@ -480,9 +531,12 @@ func validateQuestion(q *models.Question) error {
 	}
 	switch q.Type {
 	case models.QuestionEssay:
-		q.ExpectedAnswer = strings.TrimSpace(q.ExpectedAnswer)
+		q.NormalizeEssayRefs()
 		if q.ExpectedAnswer == "" {
 			return &simpleError{"expectedAnswer required for essay questions"}
+		}
+		if len(q.EssayReferences()) > 8 {
+			return &simpleError{"no máximo 8 respostas aceitas"}
 		}
 		q.Options = nil
 		q.CorrectIndex = -1
@@ -509,6 +563,7 @@ func validateQuestion(q *models.Question) error {
 			return &simpleError{"correctIndex out of range"}
 		}
 		q.ExpectedAnswer = ""
+		q.ExpectedAnswers = nil
 		if q.TimeLimitSec <= 0 {
 			q.TimeLimitSec = 60
 		}

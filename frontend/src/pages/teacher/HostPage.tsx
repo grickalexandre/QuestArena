@@ -73,6 +73,7 @@ export default function HostPage() {
   const [endsAt, setEndsAt] = useState<number | null>(null)
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [expectedAnswer, setExpectedAnswer] = useState('')
+  const [expectedAnswers, setExpectedAnswers] = useState<string[]>([])
   const [results, setResults] = useState<ResultEntry[]>([])
   const [board, setBoard] = useState<BoardEntry[]>([])
   const [answered, setAnswered] = useState(0)
@@ -118,6 +119,7 @@ export default function HostPage() {
           questionResult?: {
             correctIndex: number
             expectedAnswer?: string
+            expectedAnswers?: string[]
             leaderboard: BoardEntry[]
             results: ResultEntry[]
             autoNextInSec?: number
@@ -137,6 +139,7 @@ export default function HostPage() {
         if (d.questionResult) {
           setCorrectIndex(d.questionResult.correctIndex)
           setExpectedAnswer(d.questionResult.expectedAnswer || '')
+          setExpectedAnswers(d.questionResult.expectedAnswers || [])
           setResults(d.questionResult.results || [])
           setBoard(d.questionResult.leaderboard)
           setEndsAt(null)
@@ -158,6 +161,7 @@ export default function HostPage() {
         setEndsAt(new Date(d.endsAt).getTime())
         setCorrectIndex(null)
         setExpectedAnswer('')
+        setExpectedAnswers([])
         setResults([])
         setAnswered(0)
         setAutoNextIn(null)
@@ -170,6 +174,7 @@ export default function HostPage() {
         const d = data as {
           correctIndex: number
           expectedAnswer?: string
+          expectedAnswers?: string[]
           leaderboard: BoardEntry[]
           results: ResultEntry[]
           autoNextInSec?: number
@@ -177,6 +182,7 @@ export default function HostPage() {
         setPhase('reveal')
         setCorrectIndex(d.correctIndex)
         setExpectedAnswer(d.expectedAnswer || '')
+        setExpectedAnswers(d.expectedAnswers || [])
         setResults(d.results || [])
         setBoard(d.leaderboard)
         setEndsAt(null)
@@ -329,6 +335,18 @@ export default function HostPage() {
                 <div className="expected-box">
                   <span className="label">Resposta esperada</span>
                   <p>{expectedAnswer}</p>
+                  {expectedAnswers.length > 0 && (
+                    <>
+                      <span className="label" style={{ marginTop: '0.7rem' }}>
+                        Também aceitas
+                      </span>
+                      <ul className="alt-accepted">
+                        {expectedAnswers.map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
               )}
               {phase === 'reveal' && (

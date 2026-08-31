@@ -13,6 +13,7 @@ const emptyForm = {
   options: ['', '', '', ''],
   correctIndex: 0,
   expectedAnswer: '',
+  expectedAnswers: [] as string[],
   similarityThreshold: 0.55,
   hasCode: false,
   codeSnippet: '',
@@ -22,10 +23,17 @@ const emptyForm = {
 }
 
 const OPTION_COLORS = ['#e21b3c', '#1368ce', '#d89e00', '#26890c']
+const MAX_ESSAY_REFS = 8
 
 function secToMin(sec: number) {
   if (!sec || sec <= 0) return 1
   return Math.max(1, Math.round(sec / 60))
+}
+
+function previewText(s: string, n = 90) {
+  const t = s.trim()
+  if (t.length <= n) return t
+  return `${t.slice(0, n).trimEnd()}…`
 }
 
 function formatDuration(sec: number) {
@@ -46,6 +54,8 @@ export default function QuizEditorPage() {
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [trialAnswer, setTrialAnswer] = useState('')
+  const [trial, setTrial] = useState<{ similarity: number; passed: boolean } | null>(null)
 
   useEffect(() => {
     if (!token || !id) return
@@ -64,6 +74,33 @@ export default function QuizEditorPage() {
       }
     })()
   }, [token, id])
+
+  useEffect(() => {
+    if (form.type !== 'essay' || !token) {
+      setTrial(null)
+      return
+    }
+    const expected = form.expectedAnswer.trim()
+    const text = trialAnswer.trim()
+    if (!expected || !text) {
+      setTrial(null)
+      return
+    }
+    const alts = form.expectedAnswers.map((a) => a.trim()).filter(Boolean)
+    const threshold = Number(form.similarityThreshold) || 0.55
+    const handle = window.setTimeout(() => {
+      api
+        .previewSimilarity(token, {
+          text,
+          expectedAnswer: expected,
+          expectedAnswers: alts,
+          threshold,
+        })
+        .then((res) => setTrial({ similarity: res.similarity, passed: res.passed }))
+        .catch(() => setTrial(null))
+    }, 350)
+    return () => window.clearTimeout(handle)
+  }, [form.type, form.expectedAnswer, form.expectedAnswers, form.similarityThreshold, trialAnswer, token])
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
 
@@ -89,6 +126,7 @@ export default function QuizEditorPage() {
       options: [...(q.options || []), '', '', '', ''].slice(0, 4),
       correctIndex: q.correctIndex ?? 0,
       expectedAnswer: q.expectedAnswer || '',
+      expectedAnswers: [...(q.expectedAnswers || [])],
       similarityThreshold: q.similarityThreshold || 0.55,
       hasCode: Boolean(q.codeSnippet),
       codeSnippet: q.codeSnippet || '',
@@ -96,6 +134,8 @@ export default function QuizEditorPage() {
       weight: q.weight,
       timeLimitMin: secToMin(q.timeLimitSec),
     })
+    setTrialAnswer('')
+    setTrial(null)
   }
 
   async function onSubmit(e: FormEvent) {
@@ -121,6 +161,7 @@ export default function QuizEditorPage() {
         return
       }
       payload.expectedAnswer = form.expectedAnswer.trim()
+      payload.expectedAnswers = form.expectedAnswers.map((a) => a.trim()).filter(Boolean)
       payload.similarityThreshold = Number(form.similarityThreshold) || 0.55
       payload.options = []
       payload.correctIndex = -1
@@ -133,6 +174,7 @@ export default function QuizEditorPage() {
       payload.options = options
       payload.correctIndex = Math.min(form.correctIndex, options.length - 1)
       payload.expectedAnswer = ''
+      payload.expectedAnswers = []
     }
 
     try {
@@ -145,6 +187,8 @@ export default function QuizEditorPage() {
       }
       setForm(emptyForm)
       setEditingId(null)
+      setTrialAnswer('')
+      setTrial(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar')
     }
@@ -298,15 +342,56 @@ export default function QuizEditorPage() {
             ) : (
               <>
                 <label>
-                  Resposta esperada
+                  Resposta de referência
                   <textarea
                     required
                     value={form.expectedAnswer}
                     onChange={(e) => setForm({ ...form, expectedAnswer: e.target.value })}
                     rows={4}
-                    placeholder="Texto de referência para correção por similaridade"
+                    placeholder="Resposta-modelo. O aluno pode escrever com outras palavras."
                   />
                 </label>
+                <div className="alt-answers">
+                  <span className="field-label">Respostas alternativas aceitas</span>
+                  <p className="muted tiny">
+                    Sinônimos ou outras formas corretas. A correção usa a melhor similaridade.
+                  </p>
+                  {form.expectedAnswers.map((alt, i) => (
+                    <div className="alt-row" key={i}>
+                      <textarea
+                        value={alt}
+                        rows={2}
+                        placeholder={`Alternativa ${i + 1}`}
+                        onChange={(e) => {
+                          const next = [...form.expectedAnswers]
+                          next[i] = e.target.value
+                          setForm({ ...form, expectedAnswers: next })
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            expectedAnswers: form.expectedAnswers.filter((_, idx) => idx !== i),
+                          })
+                        }
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                  {form.expectedAnswers.length < MAX_ESSAY_REFS - 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setForm({ ...form, expectedAnswers: [...form.expectedAnswers, ''] })}
+                    >
+                      + Adicionar alternativa
+                    </button>
+                  )}
+                </div>
                 <label>
                   Limiar de similaridade ({Math.round(form.similarityThreshold * 100)}%)
                   <input
@@ -319,8 +404,26 @@ export default function QuizEditorPage() {
                   />
                 </label>
                 <p className="muted tiny">
-                  XP proporcional à similaridade. Acima do limiar conta como “acertou”.
+                  XP sempre proporcional à similaridade. Só conta como acerto se passar do limiar. 40–55%
+                  aceita paráfrases; 80%+ exige texto bem próximo.
                 </p>
+                <div className="essay-trial">
+                  <span className="field-label">Testar correção</span>
+                  <textarea
+                    value={trialAnswer}
+                    rows={3}
+                    placeholder="Digite uma resposta de aluno para ver se passaria no limiar atual"
+                    onChange={(e) => setTrialAnswer(e.target.value)}
+                  />
+                  {trial && trialAnswer.trim() && form.expectedAnswer.trim() ? (
+                    <p className={`essay-trial-result ${trial.passed ? 'ok' : 'ko'}`}>
+                      {Math.round(trial.similarity * 100)}% similar ·{' '}
+                      {trial.passed ? 'seria aceita' : 'abaixo do limiar'}
+                    </p>
+                  ) : (
+                    <p className="muted tiny">O resultado aparece enquanto você digita.</p>
+                  )}
+                </div>
               </>
             )}
 
@@ -359,6 +462,8 @@ export default function QuizEditorPage() {
                   onClick={() => {
                     setEditingId(null)
                     setForm(emptyForm)
+                    setTrialAnswer('')
+                    setTrial(null)
                   }}
                 >
                   Cancelar
@@ -382,9 +487,16 @@ export default function QuizEditorPage() {
                     {q.type === 'essay' ? 'Dissertativa' : 'Objetiva'} · Peso {q.weight} ·{' '}
                     {formatDuration(q.timeLimitSec)}
                     {q.type === 'essay'
-                      ? ` · limiar ${Math.round((q.similarityThreshold || 0.55) * 100)}%`
+                      ? ` · limiar ${Math.round((q.similarityThreshold || 0.55) * 100)}%${
+                          q.expectedAnswers?.length
+                            ? ` · ${1 + q.expectedAnswers.length} respostas aceitas`
+                            : ''
+                        }`
                       : ` · correta: ${q.options?.[q.correctIndex] ?? '—'}`}
                   </p>
+                  {q.type === 'essay' && q.expectedAnswer && (
+                    <p className="q-expected-preview">Ref.: {previewText(q.expectedAnswer)}</p>
+                  )}
                   {q.codeSnippet && (
                     <CodeBlock
                       code={q.codeSnippet}

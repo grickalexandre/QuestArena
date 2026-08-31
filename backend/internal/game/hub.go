@@ -592,7 +592,7 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		if threshold <= 0 {
 			threshold = 0.55
 		}
-		similarity = Similarity(text, q.ExpectedAnswer)
+		similarity = GradeEssay(text, q)
 		correct = similarity >= threshold
 		if similarity > 0 {
 			base := calcScore(q.Weight, q.TimeLimitSec, elapsed)
@@ -782,9 +782,14 @@ func (r *Room) revealLocked() {
 	}
 	r.Phase = PhaseReveal
 	payload := r.buildResultPayloadLocked()
-	payload["autoNextInSec"] = 5
+	qType := r.Questions[r.CurrentIndex].Type
+	if qType == "" {
+		qType = models.QuestionMultipleChoice
+	}
+	hold := revealHoldSec(qType)
+	payload["autoNextInSec"] = hold
 	r.broadcastLocked("question_result", payload)
-	r.scheduleAutoNextLocked()
+	r.scheduleAutoNextLocked(hold)
 }
 
 func (r *Room) buildResultPayloadLocked() map[string]any {
@@ -825,12 +830,25 @@ func (r *Room) buildResultPayloadLocked() map[string]any {
 	}
 	if qType == models.QuestionEssay {
 		payload["expectedAnswer"] = q.ExpectedAnswer
+		if alts := q.EssayReferences(); len(alts) > 1 {
+			payload["expectedAnswers"] = alts[1:]
+		}
 		payload["correctIndex"] = -1
 	}
 	return payload
 }
 
-func (r *Room) scheduleAutoNextLocked() {
+func revealHoldSec(qType models.QuestionType) int {
+	if qType == models.QuestionEssay {
+		return 12
+	}
+	return 5
+}
+
+func (r *Room) scheduleAutoNextLocked(holdSec int) {
+	if holdSec <= 0 {
+		holdSec = 5
+	}
 	r.cancelAdvanceLocked()
 	ctx, cancel := context.WithCancel(context.Background())
 	r.advanceCancel = cancel
@@ -839,7 +857,7 @@ func (r *Room) scheduleAutoNextLocked() {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(time.Duration(holdSec) * time.Second):
 			r.mu.Lock()
 			defer r.mu.Unlock()
 			if r.Phase != PhaseReveal || r.CurrentIndex != index {

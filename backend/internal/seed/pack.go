@@ -8,17 +8,28 @@ import (
 	"github.com/questarena/questarena/internal/store"
 )
 
-const timeLimitOneMin = 60
+const (
+	timeLimitOneMin  = 60
+	timeLimitFiveMin = 300
+)
 
 type draftQuestion struct {
-	text         string
-	options      []string
-	correctIndex int
-	code         string
-	codeLanguage string
+	text            string
+	options         []string
+	correctIndex    int
+	code            string
+	codeLanguage    string
+	expectedAnswer  string
+	expectedAnswers []string
+	threshold       float64
+	timeLimitSec    int
 }
 
 func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
+	limit := d.timeLimitSec
+	if limit <= 0 {
+		limit = timeLimitOneMin
+	}
 	q := &models.Question{
 		QuizID:       quizID,
 		Type:         models.QuestionMultipleChoice,
@@ -27,11 +38,28 @@ func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
 		CorrectIndex: d.correctIndex,
 		CodeSnippet:  d.code,
 		Weight:       1,
-		TimeLimitSec: timeLimitOneMin,
+		TimeLimitSec: limit,
 		Order:        order,
 	}
 	if d.code != "" {
 		q.CodeLanguage = models.NormalizeCodeLanguage(d.codeLanguage)
+	}
+	if d.expectedAnswer != "" {
+		q.Type = models.QuestionEssay
+		q.ExpectedAnswer = d.expectedAnswer
+		if len(d.expectedAnswers) > 0 {
+			q.ExpectedAnswers = append([]string{}, d.expectedAnswers...)
+		}
+		q.Options = nil
+		q.CorrectIndex = -1
+		if d.threshold > 0 {
+			q.SimilarityThreshold = d.threshold
+		} else {
+			q.SimilarityThreshold = 0.5
+		}
+		if d.timeLimitSec <= 0 {
+			q.TimeLimitSec = timeLimitFiveMin
+		}
 	}
 	return q
 }
@@ -44,7 +72,10 @@ func sameContent(a, b *models.Question) bool {
 		a.CodeLanguage == b.CodeLanguage &&
 		a.Weight == b.Weight &&
 		a.TimeLimitSec == b.TimeLimitSec &&
-		slices.Equal(a.Options, b.Options)
+		a.ExpectedAnswer == b.ExpectedAnswer &&
+		a.SimilarityThreshold == b.SimilarityThreshold &&
+		slices.Equal(a.Options, b.Options) &&
+		slices.Equal(a.ExpectedAnswers, b.ExpectedAnswers)
 }
 
 // pack is a fixed quiz that every teacher receives automatically on first access.

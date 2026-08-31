@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generalização, Especialização e Autorrelacionamento — MER</title>
+<style>
+:root{
+  --bg:#12141c; --card:#1a1e2a; --line:#2e3548;
+  --text:#e8ecf4; --muted:#9aa3b5;
+  --accent:#3d8bfd; --ok:#3ecf8e; --warn:#f0a500; --err:#e85d5d;
+  --gold:#e8c547; --pink:#d98ef0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding-bottom:64px}
+a{color:var(--accent)}
+header{
+  position:sticky;top:0;z-index:20;background:#0e1016;border-bottom:1px solid var(--line);
+  padding:14px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+}
+header h1{font-size:1.05rem}
+nav{display:flex;flex-wrap:wrap;gap:8px}
+nav a{
+  color:var(--muted);text-decoration:none;font-size:.82rem;border:1px solid var(--line);
+  padding:6px 10px;border-radius:999px;
+}
+nav a:hover{color:var(--text);border-color:var(--accent)}
+main{max-width:920px;margin:28px auto;padding:0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px 22px;margin-bottom:18px}
+h2{font-size:1.35rem;color:var(--gold);margin-bottom:8px}
+h3{font-size:1.08rem;color:var(--accent);margin:22px 0 10px}
+h4{font-size:.98rem;color:var(--warn);margin:16px 0 8px}
+p{margin:10px 0;font-size:1.02rem}
+ul,ol{margin:8px 0 8px 1.3em}
+li{margin:7px 0}
+.muted{color:var(--muted)}
+.caixa{border-radius:8px;padding:14px 16px;margin:14px 0;border-left:4px solid}
+.caixa.ideia{background:rgba(61,139,253,.12);border-color:var(--accent)}
+.caixa.ok{background:rgba(62,207,142,.12);border-color:var(--ok)}
+.caixa.cuidado{background:rgba(232,93,93,.12);border-color:var(--err)}
+.caixa.resumo{background:rgba(232,197,71,.1);border-color:var(--gold)}
+.caixa strong{display:block;margin-bottom:4px}
+.ent{
+  display:inline-block;min-width:120px;background:#12151f;border:2px solid var(--accent);
+  border-radius:6px;padding:8px 12px;text-align:center;font-weight:700;font-size:.9rem;
+}
+.ent.esp{border-color:var(--ok);color:var(--ok)}
+.ent.rel{border-color:var(--gold);border-radius:40px;color:var(--gold)}
+.diagrama{
+  background:#0c0e14;border:1px dashed var(--line);border-radius:10px;
+  padding:18px 12px;margin:16px 0;overflow-x:auto;text-align:center;
+}
+.diagrama svg{max-width:100%;height:auto}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:14px 0}
+.mini{background:#12151f;border:1px solid var(--line);border-radius:8px;padding:14px;font-size:.95rem}
+.mini h4{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:.92rem;margin:14px 0}
+th,td{border:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+th{background:#12151f;color:var(--gold)}
+code{font-family:Consolas,"Courier New",monospace;background:#0c0e14;border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:#7ec8ff;font-size:.9em}
+pre.codigo{
+  font-family:Consolas,"Courier New",monospace;background:#0c0e14;border:1px solid var(--line);
+  border-radius:8px;padding:14px;overflow-x:auto;font-size:.8rem;line-height:1.45;color:#c8d4f0;
+  margin:12px 0;white-space:pre-wrap;
+}
+.ex{border:1px solid var(--line);border-radius:10px;padding:16px;margin:16px 0;background:#151924}
+.ex .n{display:inline-block;background:var(--accent);color:#fff;font-weight:700;font-size:.8rem;padding:2px 8px;border-radius:999px;margin-bottom:8px}
+.q{border-top:1px solid var(--line);padding-top:16px;margin-top:18px}
+.opcoes{display:grid;gap:8px;margin:10px 0}
+.opcao{
+  background:#12151f;border:1px solid var(--line);color:var(--text);padding:11px 13px;
+  border-radius:8px;text-align:left;cursor:pointer;font-size:.95rem;
+}
+.opcao:hover{border-color:var(--accent)}
+.opcao.certa{border-color:var(--ok);background:rgba(62,207,142,.12)}
+.opcao.errada{border-color:var(--err);background:rgba(232,93,93,.12)}
+.opcao:disabled{cursor:default}
+.gabarito{display:none;margin-top:10px}
+.gabarito.visivel{display:block}
+button.sec{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem;
+}
+button.sec:hover{color:var(--text);border-color:var(--accent)}
+.hud{font-size:.85rem;color:var(--muted)}
+footer{max-width:920px;margin:8px auto;padding:0 16px;color:var(--muted);font-size:.82rem}
+@media print{
+  body{background:#fff;color:#111}
+  header,nav,button.sec,.opcoes{display:none!important}
+  .card,.mini,.ex,.diagrama{border-color:#ccc;background:#fff;color:#111}
+  .gabarito{display:block!important}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Modelo Entidade-Relacionamento</h1>
+    <div class="hud">Generalização / Especialização · Autorrelacionamento · básico</div>
+  </div>
+  <nav>
+    <a href="#gen">Generalização</a>
+    <a href="#exemplos-gen">Exemplos</a>
+    <a href="#auto">Autorrelacionamento</a>
+    <a href="#fisico">Modelo físico</a>
+    <a href="#exercicios">Exercícios</a>
+  </nav>
+</header>
+
+<main>
+<section class="card" id="intro">
+  <h2>Para que serve esta aula</h2>
+  <p>No MER, nem todo relacionamento é “aluno faz matrícula” entre duas entidades diferentes. Duas situações aparecem muito em prova e em projeto:</p>
+  <div class="grade">
+    <div class="mini">
+      <h4>1. Generalização / especialização</h4>
+      <p>Uma entidade geral se divide em tipos mais específicos. Ex.: <strong>Pessoa</strong> → Aluno e Professor.</p>
+    </div>
+    <div class="mini">
+      <h4>2. Autorrelacionamento</h4>
+      <p>A entidade se relaciona com ela mesma. Ex.: um <strong>Funcionário</strong> supervisiona outro funcionário.</p>
+    </div>
+  </div>
+  <div class="caixa ideia">
+    <strong>Ideia-chave</strong>
+    Generalização responde: “isto é um tipo de aquilo?”. Autorrelacionamento responde: “isto se liga a outro da mesma coisa?”.
+  </div>
+</section>
+
+<section class="card" id="gen">
+  <h2>1. Generalização e especialização</h2>
+  <p><strong>Generalização</strong> é subir: juntar entidades parecidas em uma entidade-mãe (supertipo).</p>
+  <p><strong>Especialização</strong> é descer: dividir a entidade-mãe em subtipos.</p>
+  <p>Na prática, o diagrama é o mesmo. Muda só o olhar:</p>
+  <ul>
+    <li>de Aluno e Professor para Pessoa = <strong>generalizar</strong>;</li>
+    <li>de Pessoa para Aluno e Professor = <strong>especializar</strong>.</li>
+  </ul>
+
+  <h3>Exemplo clássico: Pessoa, Aluno e Professor</h3>
+  <p>Aluno e professor são pessoas. Os dois têm nome, CPF e e-mail. Mas cada um tem dados próprios.</p>
+
+  <div class="diagrama" aria-label="Diagrama Pessoa Aluno Professor">
+    <svg viewBox="0 0 640 280" width="640" height="280" role="img">
+      <text x="320" y="28" text-anchor="middle" fill="#e8c547" font-size="14" font-family="Segoe UI">Especialização</text>
+      <rect x="250" y="44" width="140" height="46" rx="6" fill="#12151f" stroke="#3d8bfd" stroke-width="2"/>
+      <text x="320" y="73" text-anchor="middle" fill="#e8ecf4" font-size="16" font-weight="700" font-family="Segoe UI">PESSOA</text>
+      <line x1="320" y1="90" x2="320" y2="140" stroke="#9aa3b5" stroke-width="2"/>
+      <circle cx="320" cy="148" r="9" fill="#12141c" stroke="#e8c547" stroke-width="2"/>
+      <line x1="160" y1="148" x2="480" y2="148" stroke="#9aa3b5" stroke-width="2"/>
+      <line x1="160" y1="148" x2="160" y2="188" stroke="#9aa3b5" stroke-width="2"/>
+      <line x1="480" y1="148" x2="480" y2="188" stroke="#9aa3b5" stroke-width="2"/>
+      <rect x="90" y="188" width="140" height="46" rx="6" fill="#12151f" stroke="#3ecf8e" stroke-width="2"/>
+      <text x="160" y="217" text-anchor="middle" fill="#3ecf8e" font-size="16" font-weight="700" font-family="Segoe UI">ALUNO</text>
+      <rect x="410" y="188" width="140" height="46" rx="6" fill="#12151f" stroke="#3ecf8e" stroke-width="2"/>
+      <text x="480" y="217" text-anchor="middle" fill="#3ecf8e" font-size="16" font-weight="700" font-family="Segoe UI">PROFESSOR</text>
+    </svg>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Entidade</th><th>O que é comum / próprio</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Pessoa</strong> (genérica)</td><td>cpf, nome, data_nasc, email, telefone</td></tr>
+      <tr><td><strong>Aluno</strong> (especialização)</td><td>ra, curso, serie, data_matricula</td></tr>
+      <tr><td><strong>Professor</strong> (especialização)</td><td>matricula_funcional, formacao, disciplina</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa ok">
+    <strong>Por que não virar tudo uma tabela só?</strong>
+    Porque RA não faz sentido para professor, e formação acadêmica do docente não é dado típico de todo aluno. O supertipo guarda o comum; o subtipo guarda o específico.
+  </div>
+
+  <h4>Modelo físico, passo a passo</h4>
+  <p><strong>Especialização = relacionamento 1:1.</strong> A PK da tabela-filha <em>é</em> a FK para a tabela-mãe (mesmo nome).</p>
+  <p class="muted">PK PessoaId&nbsp;&nbsp;----------&nbsp;&nbsp;FK PessoaId&nbsp;&nbsp;(1:1)</p>
+  <ol>
+    <li>Tabela-mãe <code>pessoa</code>. PK: <code>PessoaId</code>. Colunas comuns: nome, dataNasc, email.</li>
+    <li>Tabela <code>aluno</code>: uma coluna <code>PessoaId</code> que é <strong>PK e FK</strong> → <code>pessoa(PessoaId)</code>.</li>
+    <li>Esse vínculo é <strong>1:1</strong>: um aluno é uma pessoa; uma pessoa-aluno aparece uma vez em <code>aluno</code>.</li>
+    <li>Não crie <code>AlunoId</code> separado: a identidade do aluno é a da pessoa.</li>
+    <li>Colunas só de aluno: ra, curso, serie.</li>
+    <li>Tabela <code>professor</code>: PK+FK <code>PessoaId</code> → <code>pessoa</code> (também 1:1). Colunas: formacao, disciplina.</li>
+  </ol>
+<pre class="codigo">pessoa     (PessoaId PK, nome, dataNasc, email)
+
+aluno      (PessoaId PK+FK → pessoa,  1:1,  ra, curso, serie)
+professor  (PessoaId PK+FK → pessoa,  1:1,  formacao, disciplina)
+
+-- PK PessoaId ---------- FK PessoaId     relacionamento 1:1</pre>
+
+  <h3>Um detalhe útil (básico)</h3>
+  <div class="mini">
+    <h4>Total ou parcial</h4>
+    <p><strong>Total:</strong> toda pessoa é aluno <em>ou</em> professor (não existe pessoa “solta”).</p>
+    <p><strong>Parcial:</strong> pode existir pessoa que não é nenhum dos dois (ex.: responsável, visitante).</p>
+  </div>
+</section>
+
+<section class="card" id="exemplos-gen">
+  <h2>2. Outros exemplos do mesmo tipo</h2>
+  <p>Use o teste: <em>“X é um tipo de Y?”</em> Se sim, é especialização.</p>
+
+  <div class="ex">
+    <span class="n">Exemplo 2</span>
+    <h4>Conta bancária</h4>
+    <p><span class="ent">CONTA</span> → <span class="ent esp">CORRENTE</span> e <span class="ent esp">POUPANÇA</span></p>
+    <p>Comum: número, agência, saldo, titular.<br>
+    Corrente: limite, tarifa, cheque especial.<br>
+    Poupança: aniversário da conta, rendimento.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <p>PK ContaId&nbsp;&nbsp;----------&nbsp;&nbsp;FK ContaId&nbsp;&nbsp;(1:1)</p>
+    <ol>
+      <li>Tabela <code>conta</code>. PK: <code>ContaId</code>.</li>
+      <li>Tabela <code>corrente</code>: <code>ContaId</code> é <strong>PK e FK</strong> → <code>conta</code>. Relacionamento <strong>1:1</strong>.</li>
+      <li>Colunas só de corrente: limite, tarifa, chequeEspecial.</li>
+      <li>Tabela <code>poupanca</code>: <code>ContaId</code> PK+FK → <code>conta</code> (1:1). Colunas: aniversario, rendimento.</li>
+    </ol>
+<pre class="codigo">conta     (ContaId PK, numero, agencia, saldo, titular)
+corrente  (ContaId PK+FK → conta, 1:1, limite, tarifa, chequeEspecial)
+poupanca  (ContaId PK+FK → conta, 1:1, aniversario, rendimento)</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo 3</span>
+    <h4>Veículo</h4>
+    <p><span class="ent">VEÍCULO</span> → <span class="ent esp">CARRO</span>, <span class="ent esp">MOTO</span>, <span class="ent esp">CAMINHÃO</span></p>
+    <p>Comum: placa, chassi, ano, cor.<br>
+    Carro: nPortas, airbag.<br>
+    Moto: cilindradas.<br>
+    Caminhão: eixos, capacidadeCarga.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <p>PK VeiculoId&nbsp;&nbsp;----------&nbsp;&nbsp;FK VeiculoId&nbsp;&nbsp;(1:1)</p>
+    <ol>
+      <li>Tabela <code>veiculo</code>. PK: <code>VeiculoId</code>.</li>
+      <li>Tabela <code>carro</code>: <code>VeiculoId</code> é <strong>PK e FK</strong> → <code>veiculo</code> (1:1). Colunas: nPortas, airbag.</li>
+      <li>Tabela <code>moto</code>: <code>VeiculoId</code> PK+FK → <code>veiculo</code> (1:1). Coluna: cilindradas.</li>
+      <li>Tabela <code>caminhao</code>: <code>VeiculoId</code> PK+FK → <code>veiculo</code> (1:1). Colunas: eixos, capacidadeCarga.</li>
+    </ol>
+<pre class="codigo">veiculo   (VeiculoId PK, placa, chassi, ano, cor)
+carro     (VeiculoId PK+FK → veiculo, 1:1, nPortas, airbag)
+moto      (VeiculoId PK+FK → veiculo, 1:1, cilindradas)
+caminhao  (VeiculoId PK+FK → veiculo, 1:1, eixos, capacidadeCarga)</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo 4</span>
+    <h4>Produto de um e-commerce</h4>
+    <p><span class="ent">PRODUTO</span> → <span class="ent esp">LIVRO</span>, <span class="ent esp">ELETRONICO</span>, <span class="ent esp">ROUPA</span></p>
+    <p>Comum: nome, preco, estoque.<br>
+    Livro: isbn, autor, editora.<br>
+    Eletrônico: voltagem, garantiaMeses.<br>
+    Roupa: tamanho, tecido, cor.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <p>PK ProdutoId&nbsp;&nbsp;----------&nbsp;&nbsp;FK ProdutoId&nbsp;&nbsp;(1:1)</p>
+    <ol>
+      <li>Tabela <code>produto</code>. PK: <code>ProdutoId</code>.</li>
+      <li>Cada subtipo usa <code>ProdutoId</code> como <strong>PK e FK</strong> (1:1).</li>
+    </ol>
+<pre class="codigo">produto     (ProdutoId PK, nome, preco, estoque)
+livro       (ProdutoId PK+FK → produto, 1:1, isbn, autor, editora)
+eletronico  (ProdutoId PK+FK → produto, 1:1, voltagem, garantiaMeses)
+roupa       (ProdutoId PK+FK → produto, 1:1, tamanho, tecido, cor)</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo 5</span>
+    <h4>Imóvel</h4>
+    <p><span class="ent">IMOVEL</span> → <span class="ent esp">CASA</span>, <span class="ent esp">APARTAMENTO</span>, <span class="ent esp">SALACOMERCIAL</span></p>
+    <p>Comum: inscricao, endereco, areaM2, valor.<br>
+    Casa: quintal, nPavimentos.<br>
+    Apartamento: andar, condominio.<br>
+    Sala comercial: pontoComercial, iptuTipo.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <p>PK ImovelId&nbsp;&nbsp;----------&nbsp;&nbsp;FK ImovelId&nbsp;&nbsp;(1:1)</p>
+    <ol>
+      <li>Tabela <code>imovel</code>. PK: <code>ImovelId</code>.</li>
+      <li>Cada subtipo: <code>ImovelId</code> é <strong>PK e FK</strong> → <code>imovel</code>, relacionamento <strong>1:1</strong>.</li>
+    </ol>
+<pre class="codigo">imovel         (ImovelId PK, inscricao, endereco, areaM2, valor)
+casa           (ImovelId PK+FK → imovel, 1:1, quintal, nPavimentos)
+apartamento    (ImovelId PK+FK → imovel, 1:1, andar, condominio)
+salacomercial  (ImovelId PK+FK → imovel, 1:1, pontoComercial, iptuTipo)</pre>
+  </div>
+
+  <div class="caixa cuidado">
+    <strong>Não confunda com relacionamento comum</strong>
+    Aluno <em>cursa</em> Disciplina não é especialização. São entidades diferentes ligadas por um fato. Especialização é quando o subtipo <strong>é um</strong> supertipo (aluno <em>é uma</em> pessoa).
+  </div>
+</section>
+
+<section class="card" id="auto">
+  <h2>3. Autorrelacionamento</h2>
+  <p>Autorrelacionamento (ou relacionamento unário) é quando <strong>a mesma entidade participa duas vezes</strong>, em papéis diferentes.</p>
+  <p>No diagrama, sai um losango da entidade e volta para ela. Os papéis precisam ter nome, senão o modelo fica ambíguo.</p>
+
+  <h3>Exemplo clássico: funcionário supervisiona funcionário</h3>
+  <div class="diagrama">
+    <svg viewBox="0 0 640 220" width="640" height="220" role="img">
+      <rect x="40" y="80" width="170" height="54" rx="6" fill="#12151f" stroke="#3d8bfd" stroke-width="2"/>
+      <text x="125" y="113" text-anchor="middle" fill="#e8ecf4" font-size="16" font-weight="700" font-family="Segoe UI">FUNCIONÁRIO</text>
+      <path d="M210 107 C 300 40, 430 40, 520 107" fill="none" stroke="#9aa3b5" stroke-width="2"/>
+      <ellipse cx="365" cy="48" rx="78" ry="28" fill="#12151f" stroke="#e8c547" stroke-width="2"/>
+      <text x="365" y="53" text-anchor="middle" fill="#e8c547" font-size="13" font-weight="700" font-family="Segoe UI">supervisiona</text>
+      <text x="250" y="72" fill="#9aa3b5" font-size="12" font-family="Segoe UI">chefe (1)</text>
+      <text x="430" y="72" fill="#9aa3b5" font-size="12" font-family="Segoe UI">subordinado (N)</text>
+      <rect x="430" y="80" width="170" height="54" rx="6" fill="#12151f" stroke="#3d8bfd" stroke-width="2"/>
+      <text x="515" y="104" text-anchor="middle" fill="#e8ecf4" font-size="13" font-family="Segoe UI">FUNCIONÁRIO</text>
+      <text x="515" y="122" text-anchor="middle" fill="#9aa3b5" font-size="11" font-family="Segoe UI">(a mesma entidade)</text>
+    </svg>
+  </div>
+  <p>Um chefe pode ter vários subordinados (1:N). Um subordinado tem, em geral, um chefe. O chefe também é funcionário: por isso não criamos a entidade “Chefe”.</p>
+  <h4>Modelo físico, passo a passo</h4>
+  <ol>
+    <li>Uma tabela só: <code>funcionario</code>.</li>
+    <li>PK: <code>FuncionarioId</code>.</li>
+    <li>A FK para o chefe <strong>não pode</strong> se chamar <code>FuncionarioId</code> (já é a PK). Some o papel: <code>FuncionarioChefeId</code>.</li>
+    <li><code>FuncionarioChefeId</code> referencia <code>funcionario(FuncionarioId)</code>. NULL = não tem chefe (o diretor).</li>
+  </ol>
+<pre class="codigo">funcionario (FuncionarioId PK, nome, FuncionarioChefeId FK → funcionario)</pre>
+
+  <h3>Outros exemplos</h3>
+
+  <div class="ex">
+    <span class="n">Exemplo A — 1:1</span>
+    <h4>Pessoa é casada com Pessoa</h4>
+    <p>Papéis: conjuge1 e conjuge2. Cardinalidade 1:1 (modelo simples de casamento civil).</p>
+    <p>Atributo do relacionamento (opcional): dataCasamento, regimeBens.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <ol>
+      <li>Tabela <code>pessoa</code>. PK: <code>PessoaId</code>.</li>
+      <li>1:1 com atributo: crie tabela do relacionamento, por exemplo <code>casamento</code>.</li>
+      <li>PK: <code>CasamentoId</code>.</li>
+      <li>Duas FKs para a mesma PK de pessoa — conflito de nome. Use papel: <code>PessoaId</code> (cônjuge 1, copia a PK) e <code>PessoaParId</code> (cônjuge 2).</li>
+      <li>UNIQUE em cada FK (uma pessoa não casa duas vezes neste modelo simples).</li>
+    </ol>
+<pre class="codigo">pessoa     (PessoaId PK, nome)
+casamento  (CasamentoId PK, PessoaId FK UNIQUE, PessoaParId FK UNIQUE,
+            dataCasamento, regimeBens)</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo B — 1:N</span>
+    <h4>Disciplina é pré-requisito de Disciplina</h4>
+    <p>Papéis: disciplina anterior e disciplina posterior.</p>
+    <p>POO é pré-requisito de Linguagem de Programação I. Modelo 1:N simplificado: cada disciplina tem no máximo um pré-requisito.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <ol>
+      <li>Tabela <code>disciplina</code>. PK: <code>DisciplinaId</code>.</li>
+      <li>Coluna extra na mesma tabela: FK do pré-requisito.</li>
+      <li>Não pode se chamar <code>DisciplinaId</code>. Nome com papel: <code>DisciplinaPreId</code>.</li>
+      <li>NULL = disciplina sem pré-requisito.</li>
+    </ol>
+<pre class="codigo">disciplina (DisciplinaId PK, nome, DisciplinaPreId FK → disciplina)</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo C — 1:N</span>
+    <h4>Menu contém Menu (submenu)</h4>
+    <p>Um item de menu pode abrir outros itens (Arquivo → Abrir, Salvar). A entidade é a mesma: <strong>menu</strong>. Papéis: menu pai e submenu. Cardinalidade 1:N. A raiz (menu principal) não tem pai.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <ol>
+      <li>Tabela <code>menu</code> (sem hífen). PK: <code>MenuId</code>.</li>
+      <li>Colunas próprias: titulo, ordem, url.</li>
+      <li>FK para o menu pai. Não pode se chamar <code>MenuId</code>. Use o papel: <code>MenuPaiId</code>.</li>
+      <li><code>MenuPaiId</code> referencia <code>menu(MenuId)</code>.</li>
+      <li>NULL em <code>MenuPaiId</code> = item da barra principal (não é submenu).</li>
+    </ol>
+<pre class="codigo">menu (MenuId PK, titulo, ordem, url, MenuPaiId FK → menu)
+
+-- exemplo de linhas
+-- 1 Arquivo     MenuPaiId NULL
+-- 2 Abrir       MenuPaiId 1
+-- 3 Salvar      MenuPaiId 1
+-- 4 Editar      MenuPaiId NULL
+-- 5 Copiar      MenuPaiId 4</pre>
+  </div>
+
+  <div class="ex">
+    <span class="n">Exemplo D — N:N (peças)</span>
+    <h4>Peça é composta de Peça</h4>
+    <p>Uma bicicleta é composta de quadro, roda, banco. A roda é composta de aro, raio, pneu. Atributo do relacionamento: quantidade.</p>
+    <h4>Modelo físico, passo a passo</h4>
+    <ol>
+      <li>Tabela <code>peca</code>. PK: <code>PecaId</code>.</li>
+      <li>N:N precisa de tabela associativa: <code>pecacomposicao</code>.</li>
+      <li>PK da associativa: <code>PecaComposicaoId</code>.</li>
+      <li>Duas FKs para <code>peca</code>. Uma pode copiar a PK: <code>PecaId</code> (conjunto). A outra leva o papel: <code>PecaItemId</code> (componente).</li>
+      <li>Atributo <code>quantidade</code> fica na associativa.</li>
+    </ol>
+<pre class="codigo">peca            (PecaId PK, nome)
+pecacomposicao  (PecaComposicaoId PK, PecaId FK, PecaItemId FK, quantidade)</pre>
+  </div>
+
+  <div class="caixa resumo">
+    <strong>Checklist do autorrelacionamento</strong>
+    1) A entidade é a mesma nas duas pontas?<br>
+    2) Os papéis têm nome claro (chefe/subordinado, pai/filho, origem/destino)?<br>
+    3) A cardinalidade foi definida (1:1, 1:N ou N:N)?<br>
+    4) O relacionamento tem atributo próprio? (data, quantidade, resultado)
+  </div>
+
+  <h3>Generalização × autorrelacionamento</h3>
+  <table>
+    <thead>
+      <tr><th></th><th>Generalização / especialização</th><th>Autorrelacionamento</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Pergunta</td>
+        <td>Isto <strong>é um tipo</strong> daquilo?</td>
+        <td>Isto <strong>se relaciona com outro igual</strong>?</td>
+      </tr>
+      <tr>
+        <td>Exemplo</td>
+        <td>Aluno é uma Pessoa</td>
+        <td>Funcionário supervisiona Funcionário</td>
+      </tr>
+      <tr>
+        <td>No banco</td>
+        <td>Tabela-mãe + tabelas-filhas (veja o modelo físico)</td>
+        <td>FK para a própria tabela, ou tabela associativa</td>
+      </tr>
+      <tr>
+        <td>Erro comum</td>
+        <td>Criar entidade Aluno sem aproveitar Pessoa</td>
+        <td>Criar entidade “Chefe” só porque existe o papel de chefe</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card" id="fisico">
+  <h2>4. Modelo físico (como vira tabela)</h2>
+  <p>O MER (entidade, especialização, losango) é o <strong>modelo conceitual</strong>. O <strong>modelo físico</strong> é o que o SGBD realmente cria: nome de tabela, nome de coluna, PK e FK.</p>
+  <p>Nesta disciplina usamos esta nomenclatura, <strong>sem hífen</strong>:</p>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Regra</th><th>Exemplo</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tabela</td>
+        <td>Um nome, minúsculo, sem hífen e sem espaço</td>
+        <td><code>aluno</code>, <code>professor</code>, <code>carro</code>, <code>pessoa</code></td>
+      </tr>
+      <tr>
+        <td>PK (entidade “solta”)</td>
+        <td><strong>NomeTabela + Id</strong> — PK e FK sempre terminam em <code>Id</code></td>
+        <td><code>PessoaId</code>, <code>FuncionarioId</code>, <code>MenuId</code></td>
+      </tr>
+      <tr>
+        <td>Especialização</td>
+        <td><strong>PK da filha = FK da mãe</strong>, mesmo nome. Relacionamento <strong>1:1</strong></td>
+        <td>PK PessoaId ---------- FK PessoaId (1:1) em <code>aluno</code></td>
+      </tr>
+      <tr>
+        <td>FK</td>
+        <td>Quando possível, <strong>o mesmo nome da PK referenciada</strong></td>
+        <td>Em <code>aluno</code>, a FK para pessoa se chama <code>PessoaId</code></td>
+      </tr>
+      <tr>
+        <td>FK (exceção)</td>
+        <td>Se duas FKs apontam para a <em>mesma</em> PK (autorrelacionamento ou N:N na mesma tabela), o nome igual duplicaria coluna. Aí entra o <strong>papel</strong> antes do <code>Id</code></td>
+        <td><code>FuncionarioChefeId</code> → <code>funcionario.FuncionarioId</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="caixa ideia">
+    <strong>Como montar a PK, passo a passo</strong>
+    1. Escreva o nome da tabela-mãe: <code>pessoa</code>.<br>
+    2. PK e FK terminam em <code>Id</code>: tabela <code>pessoa</code> → <code>PessoaId</code> (sem hífen).<br>
+    3. Na especialização, a filha <strong>não ganha PK nova</strong>: usa a mesma coluna como PK e FK (1:1).<br>
+    Errado: <code>aluno-id</code>, <code>id</code> solto, <code>idPessoa</code> (Id no começo), ou PK <code>AlunoId</code> + FK <code>PessoaId</code> (nesta aula a especialização é PK+FK na mesma coluna).
+  </div>
+
+  <h3>4.1 Por que a FK copia o nome da PK</h3>
+  <p>Se a PK de <code>pessoa</code> é <code>PessoaId</code>, a FK que aponta para pessoa também se chama <code>PessoaId</code>, salvo conflito de nome.</p>
+  <p>Na <strong>generalização / especialização</strong> essa FK <strong>é também a PK</strong> da tabela-filha. O relacionamento é <strong>1:1</strong>:</p>
+  <p><code>pessoa.PessoaId</code> (PK)&nbsp;&nbsp;----------&nbsp;&nbsp;<code>aluno.PessoaId</code> (PK + FK)&nbsp;&nbsp;relacionamento 1:1</p>
+
+  <h3>4.2 Físico da especialização: Pessoa → Aluno e Professor</h3>
+  <p>Três tabelas. A filha tem <strong>uma coluna</strong> que é PK e FK: <code>PessoaId</code>. Relacionamento <strong>1:1</strong>.</p>
+  <p><code>PK PessoaId</code>&nbsp;&nbsp;----------&nbsp;&nbsp;<code>FK PessoaId</code>&nbsp;&nbsp;(1:1)</p>
+
+  <div class="diagrama" aria-label="Modelo fisico pessoa aluno professor">
+    <svg viewBox="0 0 720 310" width="720" height="310" role="img">
+      <rect x="250" y="16" width="220" height="88" rx="8" fill="#12151f" stroke="#3d8bfd" stroke-width="2"/>
+      <text x="360" y="38" text-anchor="middle" fill="#3d8bfd" font-size="14" font-weight="700" font-family="Segoe UI">pessoa</text>
+      <text x="270" y="62" fill="#e8c547" font-size="12" font-family="Consolas,monospace">PK PessoaId</text>
+      <text x="270" y="82" fill="#9aa3b5" font-size="12" font-family="Segoe UI">nome, dataNasc, email</text>
+      <line x1="300" y1="104" x2="160" y2="150" stroke="#e8c547" stroke-width="2"/>
+      <line x1="420" y1="104" x2="560" y2="150" stroke="#e8c547" stroke-width="2"/>
+      <text x="175" y="140" fill="#e8c547" font-size="11" font-family="Segoe UI">1:1 PK=FK</text>
+      <text x="500" y="140" fill="#e8c547" font-size="11" font-family="Segoe UI">1:1 PK=FK</text>
+      <rect x="40" y="158" width="240" height="120" rx="8" fill="#12151f" stroke="#3ecf8e" stroke-width="2"/>
+      <text x="160" y="182" text-anchor="middle" fill="#3ecf8e" font-size="14" font-weight="700" font-family="Segoe UI">aluno</text>
+      <text x="58" y="206" fill="#e8c547" font-size="12" font-family="Consolas,monospace">PK+FK PessoaId</text>
+      <text x="58" y="226" fill="#9aa3b5" font-size="12" font-family="Segoe UI">ra, curso, serie</text>
+      <text x="58" y="248" fill="#d98ef0" font-size="12" font-family="Consolas,monospace">FK PessoaOrientadorId</text>
+      <rect x="440" y="158" width="240" height="100" rx="8" fill="#12151f" stroke="#3ecf8e" stroke-width="2"/>
+      <text x="560" y="182" text-anchor="middle" fill="#3ecf8e" font-size="14" font-weight="700" font-family="Segoe UI">professor</text>
+      <text x="458" y="206" fill="#e8c547" font-size="12" font-family="Consolas,monospace">PK+FK PessoaId</text>
+      <text x="458" y="226" fill="#9aa3b5" font-size="12" font-family="Segoe UI">formacao, disciplina</text>
+    </svg>
+  </div>
+  <p class="muted">Orientador: PK de <code>professor</code> também é <code>PessoaId</code>. Em <code>aluno</code> essa coluna já é o próprio aluno. Use o papel: <code>PessoaOrientadorId</code> (1:N).</p>
+
+<pre class="codigo">CREATE TABLE pessoa (
+    PessoaId   INT         NOT NULL,
+    nome           VARCHAR(80) NOT NULL,
+    dataNasc       DATE        NULL,
+    email          VARCHAR(80) NULL,
+    CONSTRAINT pkPessoa PRIMARY KEY (PessoaId)
+);
+
+CREATE TABLE professor (
+    PessoaId INT         NOT NULL,  -- PK e FK, relacionamento 1:1
+    formacao     VARCHAR(80) NULL,
+    disciplina   VARCHAR(60) NULL,
+    CONSTRAINT pkProfessor PRIMARY KEY (PessoaId),
+    CONSTRAINT fkProfessorPessoa FOREIGN KEY (PessoaId)
+        REFERENCES pessoa (PessoaId)
+);
+
+CREATE TABLE aluno (
+    PessoaId           INT         NOT NULL,  -- PK e FK, 1:1 com pessoa
+    PessoaOrientadorId INT         NULL,      -- 1:N para professor
+    ra                     VARCHAR(20) NOT NULL,
+    curso                  VARCHAR(60) NULL,
+    serie                  VARCHAR(10) NULL,
+    CONSTRAINT pkAluno PRIMARY KEY (PessoaId),
+    CONSTRAINT ukAlunoRa UNIQUE (ra),
+    CONSTRAINT fkAlunoPessoa FOREIGN KEY (PessoaId)
+        REFERENCES pessoa (PessoaId),
+    CONSTRAINT fkAlunoOrientador FOREIGN KEY (PessoaOrientadorId)
+        REFERENCES professor (PessoaId)
+);</pre>
+
+  <div class="caixa ok">
+    <strong>Leitura linha a linha (aluno)</strong>
+    <code>PessoaId</code> — <strong>PK e FK</strong>. Relacionamento <strong>1:1</strong>: PK ---------- FK.<br>
+    <code>PessoaOrientadorId</code> — FK 1:N para professor (papel, porque <code>PessoaId</code> já existe).<br>
+    <code>ra</code>, <code>curso</code>, <code>serie</code> — só de aluno.
+  </div>
+
+  <div class="caixa cuidado">
+    <strong>O que não fazer na especialização</strong>
+    Criar <code>AlunoId</code> além de <code>PessoaId</code>.<br>
+    FK com outro nome (<code>idPessoa</code>, <code>codPes</code>).<br>
+    Hífen no nome.
+  </div>
+
+  <h3>4.3 Outro exemplo físico: Veículo → Carro (e autorrelacionamento no carro)</h3>
+  <p>Especialização 1:1: PK+FK <code>VeiculoId</code>. Auto: um carro deriva de outro.</p>
+
+<pre class="codigo">CREATE TABLE veiculo (
+    VeiculoId INT         NOT NULL,
+    placa         CHAR(7)     NOT NULL,
+    ano           INT         NULL,
+    cor           VARCHAR(30) NULL,
+    CONSTRAINT pkVeiculo PRIMARY KEY (VeiculoId),
+    CONSTRAINT ukVeiculoPlaca UNIQUE (placa)
+);
+
+CREATE TABLE carro (
+    VeiculoId     INT     NOT NULL,  -- PK e FK, 1:1
+    VeiculoBaseId INT     NULL,      -- auto → carro(VeiculoId)
+    nPortas           INT     NULL,
+    airbag            CHAR(1) NULL,
+    CONSTRAINT pkCarro PRIMARY KEY (VeiculoId),
+    CONSTRAINT fkCarroVeiculo FOREIGN KEY (VeiculoId)
+        REFERENCES veiculo (VeiculoId),
+    CONSTRAINT fkCarroBase FOREIGN KEY (VeiculoBaseId)
+        REFERENCES carro (VeiculoId)
+);</pre>
+
+  <p><code>VeiculoBaseId</code> aponta para <code>carro(VeiculoId)</code>. Não pode se chamar <code>VeiculoId</code> (já é a PK+FK da especialização).</p>
+
+  <h3>4.4 Físico do autorrelacionamento 1:N (funcionário)</h3>
+  <p>Uma tabela só. A FK aponta para a PK da <em>mesma</em> tabela. Nome da FK = Tabela + Papel + <code>Id</code> (sempre termina em <code>Id</code>).</p>
+
+<pre class="codigo">CREATE TABLE funcionario (
+    FuncionarioId      INT         NOT NULL,
+    nome                   VARCHAR(80) NOT NULL,
+    FuncionarioChefeId INT         NULL,  -- FK para a própria PK
+    CONSTRAINT pkFuncionario PRIMARY KEY (FuncionarioId),
+    CONSTRAINT fkFuncionarioChefe FOREIGN KEY (FuncionarioChefeId)
+        REFERENCES funcionario (FuncionarioId)
+);</pre>
+
+  <table>
+    <thead>
+      <tr><th>FuncionarioId</th><th>nome</th><th>FuncionarioChefeId</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Ana (diretora)</td><td>NULL</td></tr>
+      <tr><td>2</td><td>Bruno</td><td>1</td></tr>
+      <tr><td>3</td><td>Carla</td><td>1</td></tr>
+      <tr><td>4</td><td>Diego</td><td>2</td></tr>
+    </tbody>
+  </table>
+  <p>Ana não tem chefe. Bruno e Carla têm chefe 1. Diego tem chefe 2 (Bruno). A coluna nunca se chama só <code>FuncionarioId</code> duas vezes.</p>
+
+  <h3>4.5 Físico do autorrelacionamento N:N (peça composta de peça)</h3>
+  <p>N:N gera <strong>tabela associativa</strong>. As duas pontas são a mesma entidade, então as duas FKs não podem ter o mesmo nome. Uma copia a PK; a outra leva o papel.</p>
+
+<pre class="codigo">CREATE TABLE peca (
+    PecaId INT         NOT NULL,
+    nome       VARCHAR(80) NOT NULL,
+    CONSTRAINT pkPeca PRIMARY KEY (PecaId)
+);
+
+CREATE TABLE pecacomposicao (
+    PecaComposicaoId INT          NOT NULL,
+    PecaId           INT          NOT NULL,  -- peça montada (conjunto)
+    PecaItemId       INT          NOT NULL,  -- peça que entra (componente)
+    quantidade           DECIMAL(8,2) NOT NULL,
+    CONSTRAINT pkPecaComposicao PRIMARY KEY (PecaComposicaoId),
+    CONSTRAINT fkComposicaoConjunto FOREIGN KEY (PecaId)
+        REFERENCES peca (PecaId),
+    CONSTRAINT fkComposicaoItem FOREIGN KEY (PecaItemId)
+        REFERENCES peca (PecaId)
+);</pre>
+
+  <p><code>PecaId</code> na associativa copia a PK (peça-conjunto). A segunda ponta precisa do papel antes do <code>Id</code>: <code>PecaItemId</code>. Quantidade é atributo do relacionamento e fica na associativa — não em <code>peca</code>.</p>
+
+  <h3>4.6 Mapa rápido: conceitual → físico</h3>
+  <table>
+    <thead>
+      <tr><th>No MER</th><th>No físico (nossa nomenclatura)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Entidade Aluno (subtipo)</td>
+        <td>Tabela <code>aluno</code> com PK+FK <code>PessoaId</code> (1:1)</td>
+      </tr>
+      <tr>
+        <td>Especialização Pessoa → Aluno</td>
+        <td>PK PessoaId ---------- FK PessoaId (mesmo nome, 1:1)</td>
+      </tr>
+      <tr>
+        <td>Relacionamento 1:N Professor orienta Aluno</td>
+        <td>Em <code>aluno</code>, FK <code>PessoaOrientadorId</code> → <code>professor(PessoaId)</code></td>
+      </tr>
+      <tr>
+        <td>Autorrelacionamento 1:N</td>
+        <td>FK na própria tabela: <code>FuncionarioChefeId</code></td>
+      </tr>
+      <tr>
+        <td>Autorrelacionamento N:N</td>
+        <td>Tabela extra; uma FK com o nome da PK, a outra com papel</td>
+      </tr>
+      <tr>
+        <td>Atributo do relacionamento (quantidade, data)</td>
+        <td>Coluna na tabela que “segura” o relacionamento (lado N ou associativa)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="caixa resumo">
+    <strong>Checklist antes de criar a tabela</strong>
+    1. Nome da tabela: uma palavra, sem hífen (<code>aluno</code>, <code>professor</code>, <code>carro</code>).<br>
+    2. Entidade “solta”: PK = NomeTabela + Id (<code>PessoaId</code>, <code>MenuId</code>). Sempre termina em <code>Id</code>.<br>
+    3. Especialização: PK da filha = FK da mãe, mesmo nome. Relacionamento 1:1. Não crie <code>AlunoId</code>.<br>
+    4. Toda FK tenta usar o nome da PK de destino (também termina em <code>Id</code>).<br>
+    5. Se o nome da PK já existe na tabela (auto, duas pontas iguais, ou PK+FK da especialização), o papel entra antes do <code>Id</code>: <code>PessoaOrientadorId</code>, <code>MenuPaiId</code>.
+  </div>
+</section>
+
+<section class="card" id="exercicios">
+  <h2>5. Exercícios</h2>
+  <p class="muted">Clique na alternativa. Nas abertas, escreva no caderno e depois use “Ver gabarito”.</p>
+  <p class="hud">Acertos nas objetivas: <span id="acertos">0</span> / <span id="total">9</span></p>
+
+  <div class="q" data-q="1" data-ok="b">
+    <h3>1. Objetiva</h3>
+    <p>Aluno e Professor herdam atributos de Pessoa. Isso é:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">Autorrelacionamento 1:N</button>
+      <button class="opcao" data-alt="b">Especialização (subtipos de um supertipo)</button>
+      <button class="opcao" data-alt="c">Relacionamento ternário</button>
+      <button class="opcao" data-alt="d">Entidade associativa</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="2" data-ok="c">
+    <h3>2. Objetiva</h3>
+    <p>“Um funcionário é chefe de vários funcionários.” O modelo correto é:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">Especialização: Funcionário → Chefe e Subordinado, sem relacionamento</button>
+      <button class="opcao" data-alt="b">Duas entidades distintas: Chefe e Funcionário, sempre</button>
+      <button class="opcao" data-alt="c">Autorrelacionamento em Funcionário, papéis chefe e subordinado, em geral 1:N</button>
+      <button class="opcao" data-alt="d">Generalização de Departamento</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="3" data-ok="d">
+    <h3>3. Objetiva</h3>
+    <p>Peça composta de Peça, com quantidade, é autorrelacionamento:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">1:1, sem atributo</button>
+      <button class="opcao" data-alt="b">somente especialização</button>
+      <button class="opcao" data-alt="c">1:N, sem atributo quantidade</button>
+      <button class="opcao" data-alt="d">N:N (uma peça entra em várias montagens; uma montagem tem várias peças), com atributo quantidade</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="4" data-ok="b">
+    <h3>4. Objetiva</h3>
+    <p>Conta → Corrente e Poupança é:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">Autorrelacionamento, porque uma conta transfere para outra</button>
+      <button class="opcao" data-alt="b">Especialização: corrente e poupança <em>são</em> contas, cada uma com dados extras</button>
+      <button class="opcao" data-alt="c">O mesmo que “conta transfere para conta”</button>
+      <button class="opcao" data-alt="d">Um relacionamento entre Conta e Agência</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="5" data-ok="c">
+    <h3>5. Objetiva</h3>
+    <p>Marque a afirmação correta:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">Todo autorrelacionamento é 1:1</button>
+      <button class="opcao" data-alt="b">Especialização exige sempre três subtipos</button>
+      <button class="opcao" data-alt="c">No autorrelacionamento os papéis devem ser nomeados para não confundir as pontas</button>
+      <button class="opcao" data-alt="d">Generalização e autorrelacionamento são nomes da mesma coisa</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="6" data-ok="a">
+    <h3>6. Objetiva — nomenclatura física</h3>
+    <p>Na tabela <code>aluno</code> (especialização de <code>pessoa</code>), a PK correta segundo o padrão da aula é:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a"><code>PessoaId</code> (PK e FK, relacionamento 1:1)</button>
+      <button class="opcao" data-alt="b"><code>aluno-id</code></button>
+      <button class="opcao" data-alt="c"><code>id</code></button>
+      <button class="opcao" data-alt="d"><code>AlunoId</code> (PK nova, além da FK)</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="7" data-ok="c">
+    <h3>7. Objetiva — FK</h3>
+    <p><code>aluno</code> aponta para <code>pessoa</code>, cuja PK é <code>PessoaId</code>. A FK em <code>aluno</code> deve se chamar:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a"><code>idPessoa</code></button>
+      <button class="opcao" data-alt="b"><code>AlunoId</code> (PK nova da filha)</button>
+      <button class="opcao" data-alt="c"><code>PessoaId</code> (mesmo nome da PK referenciada)</button>
+      <button class="opcao" data-alt="d"><code>fk1</code></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="8f" data-ok="b">
+    <h3>8. Objetiva — especialização no físico</h3>
+    <p>Na tabela <code>carro</code>, especialização de <code>veiculo</code>, o correto é:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a">PK <code>CarroId</code> e FK <code>VeiculoId</code> (duas colunas)</button>
+      <button class="opcao" data-alt="b"><code>VeiculoId</code> é PK e FK (1:1): PK ---------- FK</button>
+      <button class="opcao" data-alt="c">PK <code>id</code> e FK <code>veiculo</code></button>
+      <button class="opcao" data-alt="d">Não precisa de FK; carro e veiculo são a mesma tabela</button>
+    </div>
+  </div>
+
+  <div class="q" data-q="9f" data-ok="d">
+    <h3>9. Objetiva — autorrelacionamento no físico</h3>
+    <p>Tabela <code>menu</code>, PK <code>MenuId</code>. A FK do menu pai deve se chamar:</p>
+    <div class="opcoes">
+      <button class="opcao" data-alt="a"><code>MenuId</code> (o mesmo nome da PK, na mesma tabela)</button>
+      <button class="opcao" data-alt="b"><code>idPai</code></button>
+      <button class="opcao" data-alt="c"><code>MenuIdPai</code> (Id no meio)</button>
+      <button class="opcao" data-alt="d"><code>MenuPaiId</code> (papel antes do Id; sempre termina em Id)</button>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>10. Aberta — complete o modelo</h3>
+    <p>Uma escola tem Pessoa, com subtipos Aluno e Professor. Um professor pode orientar vários alunos (TCC). Um aluno tem no máximo um orientador.</p>
+    <p><strong>Tarefa:</strong> (1) o que é especialização e o que é relacionamento (cardinalidade); (2) escreva o <strong>modelo físico</strong>: tabelas, PK, FK e a linha PK ---------- FK (1:1).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Especialização: Pessoa → Aluno, Professor.<br>
+      Relacionamento (não é auto): Professor <em>orienta</em> Aluno, 1:N (1 professor : N alunos). Aluno participa com cardinalidade 0,1 ou 1 (no máximo um orientador).<br>
+      Não use autorrelacionamento aqui: as pontas são subtipos diferentes, não a mesma entidade no mesmo papel genérico. (Se modelar só Pessoa, aí sim poderia ser auto com papéis orientador/orientando — mas o mais claro é Professor–Aluno.)<br>
+      Físico: <code>pessoa.PessoaId</code> (PK). Em <code>aluno</code> e <code>professor</code>, PK+FK <code>PessoaId</code> → <code>pessoa</code> (1:1). Orientador (não é especialização): em <code>aluno</code>, FK <code>PessoaOrientadorId</code> → <code>professor(PessoaId)</code>.
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>11. Aberta — invente um autorrelacionamento</h3>
+    <p>No sistema de uma escola, um funcionário treina outro funcionário. Proponha papéis, cardinalidade e um atributo.</p>
+    <p><strong>Tarefa:</strong> escreva o <strong>modelo físico</strong> (tabela, PK, FK). A FK deve terminar em <code>Id</code>.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito sugerido</strong>
+      Entidade: FUNCIONARIO (tabela <code>funcionario</code>).<br>
+      Relacionamento: treina / é treinado por.<br>
+      Papéis: instrutor e aprendiz.<br>
+      Cardinalidade: 1:N (um instrutor treina vários) <em>ou</em> N:N se houver vários treinamentos.<br>
+      Atributo: data, tema, cargaHoraria.<br>
+      Físico 1:N: PK <code>FuncionarioId</code>, FK <code>FuncionarioInstrutorId</code> → <code>funcionario</code>.
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>12. Aberta — desenhe (no caderno)</h3>
+    <p>Modele:</p>
+    <ol>
+      <li>Veículo com especialização em Carro e Moto;</li>
+      <li>um carro pode ser “carro-pai” de versões (ex.: Civic → Civic Sport), autorrelacionamento.</li>
+    </ol>
+    <p>Diga se a especialização pode ser parcial (existe veículo que não é carro nem moto?).</p>
+    <p><strong>Tarefa:</strong> desenhe o conceitual <strong>e</strong> escreva o físico: tabelas <code>veiculo</code>, <code>carro</code>, <code>moto</code>, PK/FK e o autorrelacionamento no carro.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito sugerido</strong>
+      1) VEÍCULO (placa, ano) → CARRO (n_portas), MOTO (cilindradas). Se o sistema só cadastra carro e moto, especialização total. Se cadastra ônibus também, ou veículo genérico, é parcial.<br>
+      2) Autorrelacionamento em CARRO: papéis versao_base e versao_derivada, em geral 1:N. Atributo: nome_versao, ano_lancamento.<br>
+      Físico: tabela <code>veiculo</code> PK <code>VeiculoId</code>; tabela <code>carro</code> PK+FK <code>VeiculoId</code> (1:1); auto: FK <code>VeiculoBaseId</code> → <code>carro(VeiculoId)</code>.<br>
+      São dois mecanismos no mesmo domínio: tipo de veículo (especialização) e família de modelos (auto).
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>13. Desafio — escolha e justifique</h3>
+    <p>Situação: “Pasta contém pasta” em um drive da nuvem (pasta dentro de pasta).</p>
+    <p>Isso é especialização ou autorrelacionamento? Cardinalidade?</p>
+    <p><strong>Tarefa:</strong> escreva o físico da tabela <code>pasta</code> (PK e FK, os dois terminando em <code>Id</code>).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Autorrelacionamento em PASTA. Papéis: pasta_pai e pasta_filha. Cardinalidade 1:N (uma pasta contém várias; cada pasta filha tem no máximo um pai). A raiz tem pai nulo (relacionamento opcional no papel pai). Não é especialização: a pasta filha não é “um tipo de pasta diferente”; é a mesma entidade em outro nível da árvore.<br>
+      Físico: tabela <code>pasta</code>, PK <code>PastaId</code>, FK <code>PastaPaiId</code> → <code>pasta(PastaId)</code>. Não pode se chamar só <code>PastaId</code> (já é a PK). Sempre termina em <code>Id</code>.
+    </div>
+  </div>
+  <div class="q">
+    <h3>14. Aberta — nomes da PK e da FK</h3>
+    <p>Tabela <code>professor</code> aponta para <code>pessoa</code>. Depois, em <code>funcionario</code>, o chefe é outro funcionário.</p>
+    <p><strong>Tarefa:</strong> escreva PK e FK de cada caso, no padrão da aula (sempre termina em <code>Id</code>).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      <code>professor</code>: PK e FK <code>PessoaId</code> → <code>pessoa(PessoaId)</code>. Relacionamento 1:1 (PK ---------- FK).<br>
+      <code>funcionario</code>: PK <code>FuncionarioId</code>. FK <code>FuncionarioChefeId</code> → <code>funcionario(FuncionarioId)</code>. Aqui não dá para repetir o nome da PK: já existe coluna <code>FuncionarioId</code>.
+    </div>
+  </div>
+
+  <h2>5.1 Escreva o modelo físico</h2>
+  <p>No caderno, para cada item, entregue:</p>
+  <ol>
+    <li>Nome das tabelas (minúsculo, sem hífen).</li>
+    <li>Colunas. PK e FK <strong>sempre terminam em <code>Id</code></strong>.</li>
+    <li>Se for especialização: uma coluna só, PK+FK, e a linha <code>PK ---------- FK</code> (1:1).</li>
+    <li>Se for autorrelacionamento: papel <em>antes</em> do Id (<code>MenuPaiId</code>, não <code>MenuIdPai</code>).</li>
+  </ol>
+  <div class="caixa ideia">
+    <strong>Não copie o exemplo da aula no “piloto automático”</strong>
+    Leia o enunciado, monte as tabelas e só depois abra o gabarito.
+  </div>
+
+  <div class="q">
+    <h3>15. Físico — especialização</h3>
+    <p>Um laboratório cadastra <strong>equipamento</strong> (numeroPatrimonio, marca). Há dois tipos: <strong>computador</strong> (processador, ramGb) e <strong>impressora</strong> (tipo, colorida).</p>
+    <p><strong>Tarefa:</strong> escreva o modelo físico. Marque a especialização com PK ---------- FK (1:1).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Especialização: Equipamento → Computador, Impressora. Não é autorrelacionamento.
+<pre class="codigo">equipamento (EquipamentoId PK, numeroPatrimonio, marca)
+computador  (EquipamentoId PK+FK → equipamento, 1:1, processador, ramGb)
+impressora  (EquipamentoId PK+FK → equipamento, 1:1, tipo, colorida)
+
+-- PK EquipamentoId ---------- FK EquipamentoId     relacionamento 1:1</pre>
+      Não crie <code>ComputadorId</code>. A identidade do computador é a do equipamento.
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>16. Físico — especialização + relacionamento 1:N</h3>
+    <p>Hospital: <strong>pessoa</strong> (nome, cpf). Subtipos: <strong>paciente</strong> (convenio, leito) e <strong>medico</strong> (crm, especialidade). Um médico é responsável por vários pacientes. Cada paciente tem no máximo um médico responsável.</p>
+    <p><strong>Tarefa:</strong> escreva o físico completo (três tabelas, PK, FK, cardinalidades).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Especialização 1:1: Pessoa → Paciente, Medico.<br>
+      Relacionamento 1:N (não é especialização): médico responsável pelo paciente.
+<pre class="codigo">pessoa    (PessoaId PK, nome, cpf)
+medico    (PessoaId PK+FK → pessoa, 1:1, crm, especialidade)
+paciente  (PessoaId PK+FK → pessoa, 1:1,
+           PessoaMedicoId FK → medico(PessoaId),  1:N,
+           convenio, leito)
+
+-- especialização:  PK PessoaId ---------- FK PessoaId     (1:1)
+-- responsável:     PessoaMedicoId  (papel antes do Id; PessoaId já é o paciente)</pre>
+<pre class="codigo">CREATE TABLE pessoa (
+    PessoaId INT         NOT NULL,
+    nome     VARCHAR(80) NOT NULL,
+    cpf      CHAR(11)    NULL,
+    CONSTRAINT pkPessoa PRIMARY KEY (PessoaId)
+);
+CREATE TABLE medico (
+    PessoaId      INT         NOT NULL,
+    crm           VARCHAR(20) NOT NULL,
+    especialidade VARCHAR(60) NULL,
+    CONSTRAINT pkMedico PRIMARY KEY (PessoaId),
+    CONSTRAINT fkMedicoPessoa FOREIGN KEY (PessoaId) REFERENCES pessoa (PessoaId)
+);
+CREATE TABLE paciente (
+    PessoaId       INT         NOT NULL,
+    PessoaMedicoId INT         NULL,
+    convenio       VARCHAR(40) NULL,
+    leito          VARCHAR(10) NULL,
+    CONSTRAINT pkPaciente PRIMARY KEY (PessoaId),
+    CONSTRAINT fkPacientePessoa FOREIGN KEY (PessoaId) REFERENCES pessoa (PessoaId),
+    CONSTRAINT fkPacienteMedico FOREIGN KEY (PessoaMedicoId) REFERENCES medico (PessoaId)
+);</pre>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>17. Físico — autorrelacionamento 1:N</h3>
+    <p>Loja virtual: uma <strong>categoria</strong> pode conter outras categorias (Informática → Notebook → Gamer). A categoria raiz não tem pai. Colunas próprias: nome, ordem.</p>
+    <p><strong>Tarefa:</strong> uma tabela só. Escreva PK, FK e o que acontece na raiz (NULL).</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Autorrelacionamento em CATEGORIA. Papéis: categoria pai e categoria filha. 1:N. Não é especialização.
+<pre class="codigo">categoria (CategoriaId PK, nome, ordem, CategoriaPaiId FK → categoria)
+
+-- CategoriaPaiId NULL = categoria da vitrine (raiz)</pre>
+      A FK não pode se chamar <code>CategoriaId</code> (já é a PK). Papel antes do Id: <code>CategoriaPaiId</code>.
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>18. Físico — autorrelacionamento N:N</h3>
+    <p>Uma <strong>disciplina</strong> pode ser pré-requisito de várias outras, e uma disciplina pode ter vários pré-requisitos. Atributo do relacionamento: <code>obrigatorio</code> (S/N).</p>
+    <p><strong>Tarefa:</strong> escreva as tabelas (incluindo a associativa), PK e as duas FKs.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Auto N:N → tabela extra. Uma FK copia a PK; a outra leva o papel. As duas terminam em <code>Id</code>.
+<pre class="codigo">disciplina              (DisciplinaId PK, nome)
+disciplinaprerequisito  (DisciplinaPreRequisitoId PK,
+                         DisciplinaId FK → disciplina,          -- disciplina que exige
+                         DisciplinaPreId FK → disciplina,       -- o pré-requisito
+                         obrigatorio)
+
+-- as duas FKs apontam para disciplina(DisciplinaId)</pre>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>19. Físico — corrija o modelo errado</h3>
+    <p>Um aluno pediu para modelar <strong>conta</strong> → corrente e poupança. Ele entregou isto:</p>
+<pre class="codigo">conta     (id PK, numero, saldo)
+corrente  (CorrenteId PK, idConta FK, limite)
+poupanca  (PoupancaId PK, cod_conta FK, aniversario)</pre>
+    <p><strong>Tarefa:</strong> reescreva o físico no padrão da aula. Liste pelo menos três erros do modelo original.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito — erros</strong>
+      1. PK <code>id</code> solta (não diz de qual tabela; não segue NomeTabelaId).<br>
+      2. Filhas com PK nova (<code>CorrenteId</code>, <code>PoupancaId</code>) em vez de reusar a PK da mãe.<br>
+      3. FK com outro nome (<code>idConta</code>, <code>cod_conta</code>) e hífen/underscore fora do padrão.<br>
+      4. Especialização 1:1 não aparece: deveria ser a mesma coluna PK+FK.
+<pre class="codigo">conta     (ContaId PK, numero, saldo)
+corrente  (ContaId PK+FK → conta, 1:1, limite)
+poupanca  (ContaId PK+FK → conta, 1:1, aniversario)
+
+-- PK ContaId ---------- FK ContaId     relacionamento 1:1</pre>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>20. Físico — os dois mecanismos juntos</h3>
+    <p>Uma <strong>publicação</strong> (titulo, data) pode ser <strong>noticia</strong> (fonte, url) ou <strong>artigo</strong> (doi, revista). Além disso, um artigo pode ser a versão revisada de outro artigo (artigo-base → artigo revisado), 1:N.</p>
+    <p><strong>Tarefa:</strong> escreva o físico. Separe o que é especialização do que é autorrelacionamento.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+      Especialização: Publicacao → Noticia, Artigo (1:1, PK+FK <code>PublicacaoId</code>).<br>
+      Autorrelacionamento em ARTIGO: um artigo deriva de outro. A PK de artigo já é <code>PublicacaoId</code>, então a FK do artigo-base usa papel: <code>PublicacaoBaseId</code>.
+<pre class="codigo">publicacao (PublicacaoId PK, titulo, data)
+noticia    (PublicacaoId PK+FK → publicacao, 1:1, fonte, url)
+artigo     (PublicacaoId PK+FK → publicacao, 1:1,
+            PublicacaoBaseId FK → artigo(PublicacaoId),
+            doi, revista)
+
+-- especialização: PK PublicacaoId ---------- FK PublicacaoId     (1:1)
+-- auto:           PublicacaoBaseId  (não pode se chamar PublicacaoId)</pre>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>21. Físico — CREATE TABLE (laboratório)</h3>
+    <p>Documento de identificação: entidade <strong>documento</strong> (numero, orgaoEmissor, dataEmissao). Subtipos: <strong>rg</strong> (uf) e <strong>cnh</strong> (categoria, validade). Especialização 1:1.</p>
+    <p><strong>Tarefa:</strong> escreva os três <code>CREATE TABLE</code> com PK, FK e o mesmo nome <code>DocumentoId</code> na filha.</p>
+    <button class="sec" type="button" onclick="toggleGab(this)">Ver gabarito</button>
+    <div class="gabarito caixa ok">
+      <strong>Gabarito</strong>
+<pre class="codigo">CREATE TABLE documento (
+    DocumentoId  INT         NOT NULL,
+    numero       VARCHAR(30) NOT NULL,
+    orgaoEmissor VARCHAR(40) NULL,
+    dataEmissao  DATE        NULL,
+    CONSTRAINT pkDocumento PRIMARY KEY (DocumentoId)
+);
+CREATE TABLE rg (
+    DocumentoId INT     NOT NULL,
+    uf          CHAR(2) NULL,
+    CONSTRAINT pkRg PRIMARY KEY (DocumentoId),
+    CONSTRAINT fkRgDocumento FOREIGN KEY (DocumentoId)
+        REFERENCES documento (DocumentoId)
+);
+CREATE TABLE cnh (
+    DocumentoId INT         NOT NULL,
+    categoria   VARCHAR(5)  NULL,
+    validade    DATE        NULL,
+    CONSTRAINT pkCnh PRIMARY KEY (DocumentoId),
+    CONSTRAINT fkCnhDocumento FOREIGN KEY (DocumentoId)
+        REFERENCES documento (DocumentoId)
+);
+
+-- PK DocumentoId ---------- FK DocumentoId     relacionamento 1:1</pre>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>6. Recado rápido para a prova / NSA</h2>
+  <ul>
+    <li><strong>É um?</strong> → generalização / especialização (Pessoa, Aluno, Professor).</li>
+    <li><strong>Liga dois da mesma entidade?</strong> → autorrelacionamento (nomeie os papéis).</li>
+    <li>Os dois podem coexistir no mesmo modelo (Veículo se especializa em Carro <em>e</em> um carro deriva de outro carro).</li>
+    <li><strong>Físico:</strong> tabela <code>aluno</code>, <code>professor</code>, <code>carro</code>, <code>menu</code> — sem hífen. PK e FK sempre terminam em <code>Id</code> (<code>PessoaId</code>, <code>MenuId</code>). Especialização: PK da filha = FK da mãe (1:1). FK = mesmo nome da PK de destino, salvo conflito (papel antes do Id: <code>MenuPaiId</code>, <code>PessoaOrientadorId</code>).</li>
+  </ul>
+</section>
+</main>
+<footer>Material didático — MER básico · Generalização/especialização e autorrelacionamento. Use no laboratório ou projetor. As objetivas marcam certo/errado ao clicar.</footer>
+
+<script>
+(function(){
+  let acertos = 0;
+  const totalEl = document.getElementById("total");
+  const acertosEl = document.getElementById("acertos");
+  document.querySelectorAll(".q[data-ok]").forEach(q => {
+    const ok = q.dataset.ok;
+    q.querySelectorAll(".opcao").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if(q.dataset.done) return;
+        q.dataset.done = "1";
+        q.querySelectorAll(".opcao").forEach(b => {
+          b.disabled = true;
+          if(b.dataset.alt === ok) b.classList.add("certa");
+        });
+        if(btn.dataset.alt === ok){
+          acertos++;
+          acertosEl.textContent = acertos;
+        } else {
+          btn.classList.add("errada");
+        }
+      });
+    });
+  });
+})();
+function toggleGab(btn){
+  const box = btn.nextElementSibling;
+  box.classList.toggle("visivel");
+  btn.textContent = box.classList.contains("visivel") ? "Ocultar gabarito" : "Ver gabarito";
+}
+</script>
+</body>
+</html>
