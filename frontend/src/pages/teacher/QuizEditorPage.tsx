@@ -14,7 +14,8 @@ const emptyForm = {
   correctIndex: 0,
   expectedAnswer: '',
   expectedAnswers: [] as string[],
-  similarityThreshold: 0.55,
+  keyTerms: '',
+  similarityThreshold: 0.5,
   hasCode: false,
   codeSnippet: '',
   codeLanguage: 'java',
@@ -87,6 +88,10 @@ export default function QuizEditorPage() {
       return
     }
     const alts = form.expectedAnswers.map((a) => a.trim()).filter(Boolean)
+    const keyTerms = form.keyTerms
+      .split('\n')
+      .map((k) => k.trim())
+      .filter(Boolean)
     const threshold = Number(form.similarityThreshold) || 0.55
     const handle = window.setTimeout(() => {
       api
@@ -94,13 +99,14 @@ export default function QuizEditorPage() {
           text,
           expectedAnswer: expected,
           expectedAnswers: alts,
+          keyTerms,
           threshold,
         })
         .then((res) => setTrial({ similarity: res.similarity, passed: res.passed }))
         .catch(() => setTrial(null))
     }, 350)
     return () => window.clearTimeout(handle)
-  }, [form.type, form.expectedAnswer, form.expectedAnswers, form.similarityThreshold, trialAnswer, token])
+  }, [form.type, form.expectedAnswer, form.expectedAnswers, form.keyTerms, form.similarityThreshold, trialAnswer, token])
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
 
@@ -127,6 +133,7 @@ export default function QuizEditorPage() {
       correctIndex: q.correctIndex ?? 0,
       expectedAnswer: q.expectedAnswer || '',
       expectedAnswers: [...(q.expectedAnswers || [])],
+      keyTerms: (q.keyTerms || []).join('\n'),
       similarityThreshold: q.similarityThreshold || 0.55,
       hasCode: Boolean(q.codeSnippet),
       codeSnippet: q.codeSnippet || '',
@@ -162,6 +169,10 @@ export default function QuizEditorPage() {
       }
       payload.expectedAnswer = form.expectedAnswer.trim()
       payload.expectedAnswers = form.expectedAnswers.map((a) => a.trim()).filter(Boolean)
+      payload.keyTerms = form.keyTerms
+        .split('\n')
+        .map((k) => k.trim())
+        .filter(Boolean)
       payload.similarityThreshold = Number(form.similarityThreshold) || 0.55
       payload.options = []
       payload.correctIndex = -1
@@ -175,6 +186,7 @@ export default function QuizEditorPage() {
       payload.correctIndex = Math.min(form.correctIndex, options.length - 1)
       payload.expectedAnswer = ''
       payload.expectedAnswers = []
+      payload.keyTerms = []
     }
 
     try {
@@ -393,6 +405,20 @@ export default function QuizEditorPage() {
                   )}
                 </div>
                 <label>
+                  Termos-chave da correção
+                  <textarea
+                    value={form.keyTerms}
+                    rows={4}
+                    placeholder={'especialização\npessoa\nautorrelacionamento\nPessoaId'}
+                    onChange={(e) => setForm({ ...form, keyTerms: e.target.value })}
+                  />
+                </label>
+                <p className="muted tiny">
+                  Um termo por linha. A correção aceita a resposta se o aluno citar a maioria deles
+                  (sinônimos e IDs tipo PessoaId / pessoa id valem). Isso evita zerar quem acertou a
+                  ideia com outras palavras.
+                </p>
+                <label>
                   Limiar de similaridade ({Math.round(form.similarityThreshold * 100)}%)
                   <input
                     type="range"
@@ -404,8 +430,8 @@ export default function QuizEditorPage() {
                   />
                 </label>
                 <p className="muted tiny">
-                  XP sempre proporcional à similaridade. Só conta como acerto se passar do limiar. 40–55%
-                  aceita paráfrases; 80%+ exige texto bem próximo.
+                  A correção usa o melhor entre similaridade do texto e cobertura dos termos-chave.
+                  45% aceita paráfrase; 80%+ exige texto bem próximo da referência.
                 </p>
                 <div className="essay-trial">
                   <span className="field-label">Testar correção</span>

@@ -56,7 +56,7 @@ func Similarity(a, b string) float64 {
 // BestSimilarity returns the highest Similarity against any reference.
 func BestSimilarity(student string, refs []string) float64 {
 	best := 0.0
-	for _, ref := range refs {
+	for _, ref := range expandRefs(refs) {
 		if s := Similarity(student, ref); s > best {
 			best = s
 		}
@@ -64,9 +64,142 @@ func BestSimilarity(student string, refs []string) float64 {
 	return best
 }
 
-// GradeEssay scores a student text against all accepted references on the question.
+// GradeEssay scores a student text against references and key terms.
+// A short answer that hits the ideas scores well even when the model
+// paragraph is long (lexical recall against a long text would fail).
 func GradeEssay(text string, q models.Question) float64 {
-	return BestSimilarity(text, q.EssayReferences())
+	refs := q.EssayReferences()
+	lexical := BestSimilarity(text, refs)
+	keys := q.KeyTerms
+	if len(keys) == 0 {
+		keys = autoKeyTerms(refs)
+	}
+	concepts := conceptCoverage(text, keys)
+	if concepts > lexical {
+		return concepts
+	}
+	return lexical
+}
+
+func expandRefs(refs []string) []string {
+	out := make([]string, 0, len(refs)*2)
+	seen := map[string]bool{}
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" || seen[s] {
+			return
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	for _, r := range refs {
+		add(r)
+		for _, part := range strings.FieldsFunc(r, func(c rune) bool {
+			return c == '.' || c == ';' || c == '?' || c == '!' || c == '\n'
+		}) {
+			if len([]rune(strings.TrimSpace(part))) >= 16 {
+				add(part)
+			}
+		}
+	}
+	return out
+}
+
+func autoKeyTerms(refs []string) []string {
+	if len(refs) == 0 {
+		return nil
+	}
+	shortest := refs[0]
+	for _, r := range refs[1:] {
+		if len(r) < len(shortest) {
+			shortest = r
+		}
+	}
+	seen := map[string]bool{}
+	keys := make([]string, 0, 8)
+	for _, t := range strings.Fields(normalizeText(shortest)) {
+		if isStopword(t) || len([]rune(t)) < 5 {
+			continue
+		}
+		c := canonToken(t)
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		keys = append(keys, t)
+		if len(keys) == 8 {
+			break
+		}
+	}
+	return keys
+}
+
+func conceptCoverage(student string, keys []string) float64 {
+	if len(keys) == 0 {
+		return 0
+	}
+	ns := normalizeText(student)
+	compactS := strings.ReplaceAll(ns, " ", "")
+	stoks := contentTokens(ns)
+	hit := 0
+	for _, k := range keys {
+		if keyPresent(ns, compactS, stoks, k) {
+			hit++
+		}
+	}
+	return float64(hit) / float64(len(keys))
+}
+
+func keyPresent(ns, compactS string, stoks map[string]bool, key string) bool {
+	nk := normalizeText(key)
+	if nk == "" {
+		return false
+	}
+	for _, cand := range phraseCandidates(nk) {
+		if cand == "" {
+			continue
+		}
+		if strings.Contains(ns, cand) {
+			return true
+		}
+		if strings.Contains(compactS, strings.ReplaceAll(cand, " ", "")) {
+			return true
+		}
+	}
+	kt := contentTokens(nk)
+	if len(kt) == 0 {
+		return false
+	}
+	for t := range kt {
+		if !stoks[t] {
+			return false
+		}
+	}
+	return true
+}
+
+func phraseCandidates(nk string) []string {
+	out := []string{nk}
+	compact := strings.ReplaceAll(nk, " ", "")
+	if compact != nk {
+		out = append(out, compact)
+	}
+	for _, g := range phraseGroups {
+		if groupHas(g, nk) || groupHas(g, compact) {
+			out = append(out, g...)
+			break
+		}
+	}
+	return out
+}
+
+func groupHas(g []string, s string) bool {
+	for _, x := range g {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeText(s string) string {
@@ -100,7 +233,7 @@ func contentTokens(s string) map[string]bool {
 		if t == "" || isStopword(t) {
 			continue
 		}
-		out[stemToken(t)] = true
+		out[canonToken(t)] = true
 	}
 	return out
 }
@@ -137,7 +270,22 @@ func stemToken(t string) string {
 		return t
 	}
 	if r[n-1] == 's' {
-		return string(r[:n-1])
+		t = string(r[:n-1])
+		r = []rune(t)
+		n = len(r)
+	}
+	for _, suf := range []string{"izacao", "izar", "mente", "idade"} {
+		if n > len(suf)+3 && strings.HasSuffix(t, suf) {
+			return t[:len(t)-len(suf)]
+		}
+	}
+	return t
+}
+
+func canonToken(t string) string {
+	t = stemToken(t)
+	if g, ok := synIndex[t]; ok {
+		return g
 	}
 	return t
 }
@@ -162,7 +310,41 @@ var ptStopwords = map[string]bool{
 	"mais": true, "muito": true, "ja": true, "nao": true, "sim": true,
 	"tambem": true, "entre": true, "sobre": true, "ate": true,
 	"quando": true, "onde": true, "qual": true, "quais": true,
-	"porque": true,
+	"porque": true, "entao": true, "assim": true, "apenas": true,
+	"cada": true, "todo": true, "toda": true, "todos": true, "todas": true,
+	"pode": true, "podem": true, "deve": true, "devem": true,
+	"outro": true, "outra": true, "outros": true, "outras": true,
+	"fica": true, "ficam": true, "ter": true,
+}
+
+var phraseGroups = [][]string{
+	{"1 n", "1n", "um para muitos", "1 para n", "um para n"},
+	{"n n", "nn", "muitos para muitos", "n para n"},
+	{"1 1", "11", "um para um", "1 para 1"},
+}
+
+var synIndex map[string]string
+
+func init() {
+	synIndex = map[string]string{}
+	groups := [][]string{
+		{"especializacao", "especializar", "subtipo"},
+		{"generalizacao", "generalizar", "supertipo"},
+		{"autorrelacionamento", "unario", "autorelacionamento"},
+		{"funcionario", "empregado"},
+		{"chefe", "supervisor", "supervisiona"},
+		{"subordinado", "liderado"},
+		{"associativa", "intermediaria", "associacao"},
+		{"quantidade", "qtde", "qtd"},
+		{"primaria", "pk"},
+		{"estrangeira", "fk"},
+	}
+	for _, g := range groups {
+		rep := stemToken(g[0])
+		for _, w := range g {
+			synIndex[stemToken(w)] = rep
+		}
+	}
 }
 
 func diceBigrams(a, b string) float64 {

@@ -208,6 +208,9 @@ func (s *Server) handleListQuizzes(w http.ResponseWriter, r *http.Request) {
 	if err := seed.EnsureMerQuiz(r.Context(), s.Store, teacher.ID); err != nil {
 		log.Printf("seed mer quiz: %v", err)
 	}
+	if err := seed.EnsureArquiteturaQuiz(r.Context(), s.Store, teacher.ID); err != nil {
+		log.Printf("seed analise-arquitetura quiz: %v", err)
+	}
 	list, err := s.Store.ListQuizzes(r.Context(), teacher.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -453,6 +456,7 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 		Text            string   `json:"text"`
 		ExpectedAnswer  string   `json:"expectedAnswer"`
 		ExpectedAnswers []string `json:"expectedAnswers"`
+		KeyTerms        []string `json:"keyTerms"`
 		Threshold       float64  `json:"threshold"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -462,7 +466,10 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	q := models.Question{
 		ExpectedAnswer:  req.ExpectedAnswer,
 		ExpectedAnswers: req.ExpectedAnswers,
+		KeyTerms:        req.KeyTerms,
 	}
+	q.NormalizeEssayRefs()
+	q.NormalizeKeyTerms()
 	refs := q.EssayReferences()
 	if len(refs) == 0 {
 		writeErr(w, http.StatusBadRequest, "expectedAnswer required")
@@ -475,16 +482,12 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	if th > 1 {
 		th = 1
 	}
+	best := game.GradeEssay(req.Text, q)
 	matches := make([]map[string]any, 0, len(refs))
-	best := 0.0
 	for _, ref := range refs {
-		sim := game.Similarity(req.Text, ref)
-		if sim > best {
-			best = sim
-		}
 		matches = append(matches, map[string]any{
 			"answer":     ref,
-			"similarity": sim,
+			"similarity": game.Similarity(req.Text, ref),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -532,6 +535,7 @@ func validateQuestion(q *models.Question) error {
 	switch q.Type {
 	case models.QuestionEssay:
 		q.NormalizeEssayRefs()
+		q.NormalizeKeyTerms()
 		if q.ExpectedAnswer == "" {
 			return &simpleError{"expectedAnswer required for essay questions"}
 		}
@@ -564,6 +568,7 @@ func validateQuestion(q *models.Question) error {
 		}
 		q.ExpectedAnswer = ""
 		q.ExpectedAnswers = nil
+		q.KeyTerms = nil
 		if q.TimeLimitSec <= 0 {
 			q.TimeLimitSec = 60
 		}

@@ -21,6 +21,7 @@ type draftQuestion struct {
 	codeLanguage    string
 	expectedAnswer  string
 	expectedAnswers []string
+	keyTerms        []string
 	threshold       float64
 	timeLimitSec    int
 }
@@ -50,6 +51,9 @@ func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
 		if len(d.expectedAnswers) > 0 {
 			q.ExpectedAnswers = append([]string{}, d.expectedAnswers...)
 		}
+		if len(d.keyTerms) > 0 {
+			q.KeyTerms = append([]string{}, d.keyTerms...)
+		}
 		q.Options = nil
 		q.CorrectIndex = -1
 		if d.threshold > 0 {
@@ -75,7 +79,8 @@ func sameContent(a, b *models.Question) bool {
 		a.ExpectedAnswer == b.ExpectedAnswer &&
 		a.SimilarityThreshold == b.SimilarityThreshold &&
 		slices.Equal(a.Options, b.Options) &&
-		slices.Equal(a.ExpectedAnswers, b.ExpectedAnswers)
+		slices.Equal(a.ExpectedAnswers, b.ExpectedAnswers) &&
+		slices.Equal(a.KeyTerms, b.KeyTerms)
 }
 
 // pack is a fixed quiz that every teacher receives automatically on first access.

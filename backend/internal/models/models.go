@@ -37,6 +37,7 @@ type Question struct {
 	CorrectIndex        int          `json:"correctIndex" firestore:"correctIndex"`
 	ExpectedAnswer      string       `json:"expectedAnswer" firestore:"expectedAnswer"`
 	ExpectedAnswers     []string     `json:"expectedAnswers,omitempty" firestore:"expectedAnswers,omitempty"`
+	KeyTerms            []string     `json:"keyTerms,omitempty" firestore:"keyTerms,omitempty"`
 	SimilarityThreshold float64      `json:"similarityThreshold" firestore:"similarityThreshold"`
 	CodeSnippet         string       `json:"codeSnippet" firestore:"codeSnippet"`
 	CodeLanguage        string       `json:"codeLanguage" firestore:"codeLanguage"`
@@ -151,4 +152,30 @@ func (q *Question) NormalizeEssayRefs() {
 		return
 	}
 	q.ExpectedAnswers = nil
+}
+
+// NormalizeKeyTerms trims, dedupes and caps the concept list used for essay grading.
+func (q *Question) NormalizeKeyTerms() {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, len(q.KeyTerms))
+	for _, k := range q.KeyTerms {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		key := strings.ToLower(k)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, k)
+		if len(out) == 12 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		q.KeyTerms = nil
+		return
+	}
+	q.KeyTerms = out
 }

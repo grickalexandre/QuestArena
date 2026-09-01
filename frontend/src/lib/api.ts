@@ -22,6 +22,7 @@ export type Question = {
   correctIndex: number
   expectedAnswer?: string
   expectedAnswers?: string[]
+  keyTerms?: string[]
   similarityThreshold?: number
   codeSnippet?: string
   codeLanguage?: string
@@ -127,6 +128,7 @@ export const api = {
       text: string
       expectedAnswer: string
       expectedAnswers?: string[]
+      keyTerms?: string[]
       threshold?: number
     },
   ) =>

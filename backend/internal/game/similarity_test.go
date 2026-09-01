@@ -57,3 +57,39 @@ func TestGradeEssayUsesAlternatives(t *testing.T) {
 		t.Fatalf("alternative should match, got %v", got)
 	}
 }
+
+func TestGradeEssayShortParaphraseHitsKeyTerms(t *testing.T) {
+	q := models.Question{
+		ExpectedAnswer: "Generalização ou especialização pergunta se isto é um tipo daquilo: Aluno é uma Pessoa. Autorrelacionamento é a mesma entidade em papéis diferentes: Funcionário supervisiona Funcionário (chefe e subordinado).",
+		KeyTerms:       []string{"especialização", "pessoa", "autorrelacionamento", "funcionário"},
+	}
+	got := GradeEssay(
+		"Especialização é aluno ser um tipo de pessoa. Autorrelacionamento é um funcionário chefe de outro.",
+		q,
+	)
+	if got < 0.7 {
+		t.Fatalf("short correct answer should pass via key terms, got %v", got)
+	}
+}
+
+func TestGradeEssayWrongStaysLow(t *testing.T) {
+	q := models.Question{
+		ExpectedAnswer: "Especialização: Aluno é um tipo de Pessoa. Autorrelacionamento: Funcionário supervisiona Funcionário.",
+		KeyTerms:       []string{"especialização", "pessoa", "autorrelacionamento", "funcionário"},
+	}
+	got := GradeEssay("São duas tabelas quaisquer no banco", q)
+	if got >= 0.45 {
+		t.Fatalf("unrelated answer should stay below threshold, got %v", got)
+	}
+}
+
+func TestGradeEssayMatchesCompactIds(t *testing.T) {
+	q := models.Question{
+		ExpectedAnswer: "pasta com PastaId e PastaPaiId, autorrelacionamento 1:N",
+		KeyTerms:       []string{"autorrelacionamento", "1:N", "PastaId", "PastaPaiId"},
+	}
+	got := GradeEssay("e autorrelacionamento um para muitos. tabela pasta pk pasta id fk pasta pai id", q)
+	if got < 0.7 {
+		t.Fatalf("compact/spaced ids and 1:N synonym should match, got %v", got)
+	}
+}
