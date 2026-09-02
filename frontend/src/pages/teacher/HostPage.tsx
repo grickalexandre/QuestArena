@@ -18,6 +18,8 @@ type Player = {
   hidden?: boolean
   awayCount?: number
   awayTotal?: number
+  inspecting?: boolean
+  inspectCount?: number
 }
 type PublicQuestion = {
   id: string
@@ -167,7 +169,7 @@ export default function HostPage() {
         setAutoNextIn(null)
         setError('')
         if (d.players) setPlayers(d.players)
-        else setPlayers((prev) => prev.map((p) => ({ ...p, awayCount: 0 })))
+        else setPlayers((prev) => prev.map((p) => ({ ...p, awayCount: 0, inspectCount: 0 })))
       }),
       on('answer_count', (data) => setAnswered((data as { answered: number }).answered)),
       on('question_result', (data) => {
@@ -235,6 +237,8 @@ export default function HostPage() {
   const connectedCount = players.filter((p) => p.connected !== false).length
   const awayNow = players.filter((p) => p.hidden || p.connected === false)
   const flagged = players.filter((p) => (p.awayCount || 0) > 0)
+  const inspectingNow = players.filter((p) => p.inspecting)
+  const inspectFlagged = players.filter((p) => (p.inspectCount || 0) > 0)
 
   if (!loading && !teacher) return <Navigate to="/teacher/login" replace />
 
@@ -385,7 +389,13 @@ export default function HostPage() {
 
           {phase === 'question' && (
             <>
-              <PresencePanel players={players} awayNow={awayNow} flagged={flagged} />
+              <PresencePanel
+                players={players}
+                awayNow={awayNow}
+                flagged={flagged}
+                inspectingNow={inspectingNow}
+                inspectFlagged={inspectFlagged}
+              />
               <button className="btn btn-ghost" type="button" onClick={() => runHostAction('end')}>
                 Encerrar e ver notas
               </button>
@@ -481,8 +491,9 @@ export default function HostPage() {
 function playerChipClass(p: Player) {
   const parts = ['player-chip']
   if (p.connected === false) parts.push('offline')
+  if (p.inspecting) parts.push('inspect')
   if (p.hidden || p.connected === false) parts.push('away')
-  else if ((p.awayCount || 0) > 0) parts.push('flagged')
+  else if ((p.awayCount || 0) > 0 || (p.inspectCount || 0) > 0) parts.push('flagged')
   return parts.join(' ')
 }
 
@@ -490,8 +501,14 @@ function playerChipNote(p: Player) {
   if (p.connected === false) {
     return <span className="muted tiny"> · offline</span>
   }
+  if (p.inspecting) {
+    return <span className="inspect-note"> · inspecionando</span>
+  }
   if (p.hidden) {
     return <span className="away-note"> · fora da tela</span>
+  }
+  if ((p.inspectCount || 0) > 0) {
+    return <span className="inspect-note"> · F12 {p.inspectCount}x</span>
   }
   if ((p.awayCount || 0) > 0) {
     return <span className="flag-note"> · saiu {p.awayCount}x</span>
@@ -503,19 +520,35 @@ function PresencePanel({
   players,
   awayNow,
   flagged,
+  inspectingNow,
+  inspectFlagged,
 }: {
   players: Player[]
   awayNow: Player[]
   flagged: Player[]
+  inspectingNow: Player[]
+  inspectFlagged: Player[]
 }) {
   if (players.length === 0) return null
   return (
     <div className="presence-panel">
-      {awayNow.length > 0 ? (
+      {inspectingNow.length > 0 ? (
+        <p className="inspect-banner">
+          {inspectingNow.length === 1
+            ? `${inspectingNow[0].nickname} abriu o inspecionar (F12)`
+            : `${inspectingNow.length} alunos abriram o inspecionar (F12)`}
+        </p>
+      ) : awayNow.length > 0 ? (
         <p className="away-banner">
           {awayNow.length === 1
             ? `${awayNow[0].nickname} saiu da tela agora`
             : `${awayNow.length} alunos saíram da tela agora`}
+        </p>
+      ) : inspectFlagged.length > 0 ? (
+        <p className="inspect-banner">
+          {inspectFlagged.length === 1
+            ? `${inspectFlagged[0].nickname} tentou inspecionar nesta questão`
+            : `${inspectFlagged.length} alunos tentaram inspecionar nesta questão`}
         </p>
       ) : flagged.length > 0 ? (
         <p className="flag-banner">

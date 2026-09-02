@@ -138,7 +138,7 @@ func TestPresenceCountsAwayOnlyOnQuestion(t *testing.T) {
 	}
 }
 
-func TestPlayerCanChangeAnswerBeforeDeadline(t *testing.T) {
+func TestPlayerCannotChangeAnswerAfterSubmit(t *testing.T) {
 	h := NewHub(store.NewMemoryStore())
 	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
 		ID: "1", Text: "Q", Options: []string{"A", "B", "C"}, CorrectIndex: 1, Weight: 1000, TimeLimitSec: 30,
@@ -164,20 +164,88 @@ func TestPlayerCanChangeAnswerBeforeDeadline(t *testing.T) {
 		t.Fatalf("first wrong answer: %+v ans=%+v", p, room.Answers[p.ID])
 	}
 
-	c.handleAnswer(wrong)
-	if p.choice != 0 || p.Score != 0 {
-		t.Fatal("same choice should be a no-op")
-	}
-
 	right, _ := json.Marshal(map[string]any{"choice": 1})
 	c.handleAnswer(right)
-	if p.choice != 1 || p.CorrectCount != 1 || p.Score <= 0 || !room.Answers[p.ID].correct {
-		t.Fatalf("changed to correct: score=%d correctCount=%d ans=%+v", p.Score, p.CorrectCount, room.Answers[p.ID])
+	if p.choice != 0 || p.CorrectCount != 0 || p.Score != 0 || room.Answers[p.ID].correct {
+		t.Fatalf("allowed change after lock: choice=%d score=%d ans=%+v", p.choice, p.Score, room.Answers[p.ID])
 	}
 
-	score := p.Score
-	c.handleAnswer(wrong)
-	if p.choice != 0 || p.CorrectCount != 0 || p.Score != 0 || score == 0 {
-		t.Fatalf("changed back to wrong: score=%d correctCount=%d", p.Score, p.CorrectCount)
+	ack := lastEnvelopeOfType(t, c, "answer_ack")
+	if _, ok := ack["points"]; ok {
+		t.Fatalf("points leaked in answer_ack: %+v", ack)
+	}
+	if _, ok := ack["similarity"]; ok {
+		t.Fatalf("similarity leaked in answer_ack: %+v", ack)
+	}
+	if ack["locked"] != true {
+		t.Fatalf("expected locked ack: %+v", ack)
+	}
+}
+
+func TestPresenceReportsInspect(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B"}, CorrectIndex: 0, Weight: 1000, TimeLimitSec: 30,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Client{hub: h, send: make(chan []byte, 16)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	inspectOn, _ := json.Marshal(map[string]any{"inspect": true})
+	c.handlePresence(inspectOn)
+
+	var player *Player
+	for _, p := range room.Players {
+		player = p
+	}
+	if !player.Inspecting || player.InspectCount != 0 {
+		t.Fatalf("lobby should not count inspect: inspecting=%v count=%d", player.Inspecting, player.InspectCount)
+	}
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+	if player.InspectCount != 1 {
+		t.Fatalf("already inspecting at start: count=%d", player.InspectCount)
+	}
+
+	inspectOff, _ := json.Marshal(map[string]any{"inspect": false})
+	c.handlePresence(inspectOff)
+	c.handlePresence(inspectOn)
+	if !player.Inspecting || player.InspectCount != 2 {
+		t.Fatalf("inspect during question: inspecting=%v count=%d", player.Inspecting, player.InspectCount)
+	}
+}
+
+func lastEnvelopeOfType(t *testing.T, c *Client, typ string) map[string]any {
+	t.Helper()
+	var last map[string]any
+	for {
+		select {
+		case raw := <-c.send:
+			var env Envelope
+			if err := json.Unmarshal(raw, &env); err != nil {
+				t.Fatal(err)
+			}
+			if env.Type != typ {
+				continue
+			}
+			var data map[string]any
+			if err := json.Unmarshal(env.Data, &data); err != nil {
+				t.Fatal(err)
+			}
+			last = data
+		default:
+			if last == nil {
+				t.Fatalf("no %s message", typ)
+			}
+			return last
+		}
 	}
 }

@@ -65,6 +65,8 @@ type Player struct {
 	Hidden       bool   `json:"hidden"`
 	AwayCount    int    `json:"awayCount"`
 	AwayTotal    int    `json:"awayTotal"`
+	Inspecting   bool   `json:"inspecting"`
+	InspectCount int    `json:"inspectCount"`
 	conn         *Client
 	answered     bool
 	choice       int
@@ -492,10 +494,14 @@ func (c *Client) handleNext() {
 
 func (c *Client) handlePresence(data json.RawMessage) {
 	var req struct {
-		Hidden bool `json:"hidden"`
+		Hidden  *bool `json:"hidden"`
+		Inspect *bool `json:"inspect"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		c.sendError("invalid presence")
+		return
+	}
+	if req.Hidden == nil && req.Inspect == nil {
 		return
 	}
 	if c.role != RolePlayer || c.playerID == "" {
@@ -511,13 +517,24 @@ func (c *Client) handlePresence(data json.RawMessage) {
 	if !ok || player.conn != c {
 		return
 	}
-	if player.Hidden == req.Hidden {
-		return
+	changed := false
+	if req.Hidden != nil && player.Hidden != *req.Hidden {
+		player.Hidden = *req.Hidden
+		if *req.Hidden && room.Phase == PhaseQuestion {
+			player.AwayCount++
+			player.AwayTotal++
+		}
+		changed = true
 	}
-	player.Hidden = req.Hidden
-	if req.Hidden && room.Phase == PhaseQuestion {
-		player.AwayCount++
-		player.AwayTotal++
+	if req.Inspect != nil && player.Inspecting != *req.Inspect {
+		player.Inspecting = *req.Inspect
+		if *req.Inspect && room.Phase == PhaseQuestion {
+			player.InspectCount++
+		}
+		changed = true
+	}
+	if !changed {
+		return
 	}
 	room.broadcastLocked("player_presence", map[string]any{
 		"players": publicPlayers(room),
@@ -611,27 +628,13 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		}
 	}
 
-	if prev, ok := room.Answers[player.ID]; ok {
-		same := prev.text == text
-		if qType != models.QuestionEssay {
-			same = prev.choice == choice
-		}
-		if same {
-			c.emit("answer_ack", map[string]any{
-				"received":   true,
-				"updated":    false,
-				"points":     prev.points,
-				"similarity": prev.similarity,
-			})
-			return
-		}
-		player.Score -= prev.points
-		if player.Score < 0 {
-			player.Score = 0
-		}
-		if prev.correct && player.CorrectCount > 0 {
-			player.CorrectCount--
-		}
+	if _, ok := room.Answers[player.ID]; ok {
+		c.emit("answer_ack", map[string]any{
+			"received": true,
+			"updated":  false,
+			"locked":   true,
+		})
+		return
 	}
 
 	player.answered = true
@@ -650,10 +653,9 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		similarity: similarity,
 	}
 	c.emit("answer_ack", map[string]any{
-		"received":   true,
-		"updated":    true,
-		"points":     points,
-		"similarity": similarity,
+		"received": true,
+		"updated":  true,
+		"locked":   true,
 	})
 	connected := countConnected(room)
 	answered := countAnsweredConnected(room)
@@ -707,9 +709,13 @@ func (r *Room) startQuestionLocked() {
 		p.answered = false
 		p.choice = -1
 		p.AwayCount = 0
+		p.InspectCount = 0
 		if p.Hidden || p.conn == nil {
 			p.AwayCount++
 			p.AwayTotal++
+		}
+		if p.Inspecting {
+			p.InspectCount++
 		}
 	}
 	q := r.Questions[r.CurrentIndex]
@@ -1001,6 +1007,8 @@ func publicPlayers(r *Room) []map[string]any {
 			"hidden":       p.Hidden,
 			"awayCount":    p.AwayCount,
 			"awayTotal":    p.AwayTotal,
+			"inspecting":   p.Inspecting,
+			"inspectCount": p.InspectCount,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

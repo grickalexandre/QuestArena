@@ -875,6 +875,11 @@ label {
   border-color: rgba(251, 191, 36, 0.75);
 }
 
+.player-chip.inspect {
+  border-color: rgba(251, 113, 133, 0.85);
+  box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.3);
+}
+
 .player-grid.compact {
   margin: 0.75rem 0 0;
 }
@@ -889,7 +894,8 @@ label {
 }
 
 .away-banner,
-.flag-banner {
+.flag-banner,
+.inspect-banner {
   margin: 0 0 0.35rem;
   font-weight: 700;
 }
@@ -910,6 +916,33 @@ label {
 .flag-note {
   color: #fde68a;
   font-size: 0.75rem;
+}
+
+.inspect-banner,
+.inspect-note {
+  color: #fecdd3;
+}
+
+.inspect-note {
+  font-size: 0.75rem;
+}
+
+.anti-inspect,
+.anti-inspect h1,
+.anti-inspect h2,
+.anti-inspect .opt-text {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.anti-inspect textarea,
+.anti-inspect input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.play-opts .opt:disabled {
+  cursor: default;
 }
 
 .away-warn {

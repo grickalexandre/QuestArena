@@ -4,6 +4,7 @@ import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
 import { AVATARS, avatarEmoji } from '../../lib/avatars'
 import { useGameSocket } from '../../lib/useGameSocket'
+import { usePlayAntiInspect } from '../../lib/usePlayAntiInspect'
 import { usePlayPresence } from '../../lib/usePlayPresence'
 import { Leaderboard, Podium } from '../teacher/HostPage'
 
@@ -126,6 +127,7 @@ export default function PlayPage() {
   const [reconnecting, setReconnecting] = useState(false)
   const [leftThisQuestion, setLeftThisQuestion] = useState(false)
   const away = usePlayPresence(send, phase !== 'join')
+  const inspecting = usePlayAntiInspect(send, phase !== 'join')
   const remaining = useCountdown(endsAt)
   const timerPct = useMemo(() => {
     if (!question || !endsAt) return 0
@@ -242,11 +244,8 @@ export default function PlayPage() {
         setError('')
         setReconnecting(false)
       }),
-      on('answer_ack', (data) => {
-        const d = data as { points: number; similarity?: number }
+      on('answer_ack', () => {
         setLocked(true)
-        setLastPoints(d.points)
-        if (typeof d.similarity === 'number') setLastSimilarity(d.similarity)
       }),
       on('question_result', (data) => {
         applyResult(data as QuestionResult, credsRef.current.playerId)
@@ -313,8 +312,7 @@ export default function PlayPage() {
   }
 
   function answerChoice(choice: number) {
-    if (phase !== 'question') return
-    if (locked && selected === choice) return
+    if (phase !== 'question' || locked) return
     setSelected(choice)
     setError('')
     send('answer', { choice })
@@ -322,13 +320,12 @@ export default function PlayPage() {
 
   function submitEssay(e?: FormEvent) {
     e?.preventDefault()
-    if (phase !== 'question') return
+    if (phase !== 'question' || locked) return
     const text = essayDraft.trim()
     if (!text) {
       setError('Escreva sua resposta antes de enviar')
       return
     }
-    if (locked && text === submittedText.trim()) return
     setError('')
     send('answer', { text })
     setSubmittedText(text)
@@ -338,7 +335,7 @@ export default function PlayPage() {
   const myRank = board.find((b) => b.playerId === playerId)
 
   return (
-    <div className={`play-shell ${phase === 'question' || phase === 'reveal' ? 'play-focus' : ''}`}>
+    <div className={`play-shell ${phase === 'question' || phase === 'reveal' ? 'play-focus' : ''} ${phase !== 'join' ? 'anti-inspect' : ''}`}>
       {phase === 'join' && (
         <form className="join-card" onSubmit={join}>
           <Link to="/" className="brand-link">
@@ -452,6 +449,11 @@ export default function PlayPage() {
             )}
           </div>
 
+          {phase === 'question' && inspecting && (
+            <p className="error banner away-warn">
+              Inspecionar a página (F12) não é permitido. Feche as ferramentas de desenvolvedor — o professor foi avisado e o tempo continua.
+            </p>
+          )}
           {phase === 'question' && leftThisQuestion && (
             <p className="error banner away-warn">
               Você saiu da tela. O professor foi avisado.
@@ -476,6 +478,7 @@ export default function PlayPage() {
                       className={cls}
                       style={{ ['--opt' as string]: COLORS[i % COLORS.length] }}
                       onClick={() => answerChoice(i)}
+                      disabled={locked}
                     >
                       <span className="opt-letter">{String.fromCharCode(65 + i)}</span>
                       <span className="opt-text">{opt}</span>
@@ -484,9 +487,9 @@ export default function PlayPage() {
                 })}
               </div>
               {locked ? (
-                <p className="muted tiny change-hint">Resposta salva. Clique em outra opção para trocar até o tempo acabar.</p>
+                <p className="muted tiny change-hint">Resposta enviada. Não é possível trocar.</p>
               ) : (
-                <p className="muted tiny change-hint">Pode trocar a escolha enquanto o tempo estiver rodando.</p>
+                <p className="muted tiny change-hint">Escolha uma opção. A resposta fica travada depois do envio.</p>
               )}
             </>
           )}
@@ -496,22 +499,23 @@ export default function PlayPage() {
               <textarea
                 value={essayDraft}
                 onChange={(e) => setEssayDraft(e.target.value.slice(0, 2000))}
-                placeholder="Explique com suas palavras. A correção compara com a resposta de referência."
+                placeholder="Explique com suas palavras. Depois de enviar, a resposta não pode ser alterada."
                 rows={6}
                 autoFocus
+                disabled={locked}
               />
               <div className="essay-actions">
                 <span className="muted tiny">{essayDraft.trim().length}/2000</span>
                 <button
                   className="btn btn-accent btn-xl"
                   type="submit"
-                  disabled={!essayDraft.trim() || (locked && essayDraft.trim() === submittedText.trim())}
+                  disabled={!essayDraft.trim() || locked}
                 >
-                  {locked ? 'Atualizar resposta' : 'Enviar resposta'}
+                  {locked ? 'Resposta enviada' : 'Enviar resposta'}
                 </button>
               </div>
               {locked && (
-                <p className="muted tiny change-hint">Salva. Pode editar e atualizar até o tempo acabar.</p>
+                <p className="muted tiny change-hint">Enviada. Não é possível editar.</p>
               )}
             </form>
           )}
