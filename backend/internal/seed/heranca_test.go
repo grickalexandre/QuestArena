@@ -11,8 +11,8 @@ import (
 
 func TestHerancaQuestions(t *testing.T) {
 	qs := herancaQuestions()
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 20 {
+		t.Fatalf("want 20 questions, got %d", len(qs))
 	}
 	joined := strings.Builder{}
 	for i, q := range qs {
@@ -90,8 +90,8 @@ func TestEnsureHerancaQuizIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list questions: %v", err)
 	}
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 20 {
+		t.Fatalf("want 20 questions, got %d", len(qs))
 	}
 }
 
@@ -121,8 +121,8 @@ func TestEnsureHerancaRewritesOutdatedQuestions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list questions: %v", err)
 	}
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 20 {
+		t.Fatalf("want 20 questions, got %d", len(qs))
 	}
 
 	stale := qs[0]

@@ -10,7 +10,7 @@ import (
 const (
 	herancaQuizPrefix = "seed-heranca-conta-"
 	herancaTitle      = "Quest 3 — Herança até a oficina 6.1"
-	herancaDesc       = "15 certo ou errado com trechos de C# da aula: herança, classe abstrata, Laboratório A (Animal), Laboratório B (Conta) e construtor com : base. Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
+	herancaDesc       = "20 certo ou errado com trechos de C# da aula: herança, classe abstrata, Laboratório A (Animal), Laboratório B (Conta) e construtor com : base. Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
 	timeLimitHeranca  = 180
 )
 
@@ -279,6 +279,121 @@ Pocao p = new Pocao("Cura", 10, 20);`,
     {
         base(nome, preco);
         Cura = cura;
+    }
+}`,
+			false,
+		),
+		vf(
+			"No construtor do Cachorro, nome e idade passam no : base e a raça é gravada só no corpo da filha.",
+			`class Animal
+{
+    string Nome;
+    int Idade;
+
+    Animal(string nome, int idade)
+    {
+        Nome = nome;
+        Idade = idade;
+    }
+}
+
+class Cachorro : Animal
+{
+    string Raca;
+
+    Cachorro(string nome, int idade, string raca)
+        : base(nome, idade)
+    {
+        Raca = raca;
+    }
+}`,
+			true,
+		),
+		vf(
+			"Como nome e apelido são os dois texto, : base(apelido, nome) só inverte a ordem da chamada e os campos do herói ficam corretos.",
+			`class Personagem
+{
+    string Nome;
+    string Apelido;
+
+    Personagem(string nome, string apelido)
+    {
+        Nome = nome;
+        Apelido = apelido;
+    }
+}
+
+class Heroi : Personagem
+{
+    Heroi(string nome, string apelido) : base(apelido, nome)
+    {
+    }
+}
+
+Heroi h = new Heroi("Ana", "Falcao");`,
+			false,
+		),
+		vf(
+			"Depositar na poupança funciona sem a classe ContaPoupanca ter escrito esse método: ele vem da herança da Conta.",
+			`abstract class Conta
+{
+    decimal Saldo;
+
+    void Depositar(decimal valor)
+    {
+        Saldo = Saldo + valor;
+    }
+
+    abstract void Sacar(decimal valor);
+}
+
+class ContaPoupanca : Conta
+{
+    override void Sacar(decimal valor) { /* so se tiver saldo */ }
+}
+
+ContaPoupanca p = new ContaPoupanca();
+p.Depositar(200);`,
+			true,
+		),
+		vf(
+			"No foreach do zoológico, a.Dormir() também escolhe um texto diferente para cachorro e gato, do mesmo jeito que EmitirSom.",
+			`abstract class Animal
+{
+    string Nome;
+
+    void Dormir()
+    {
+        Console.WriteLine(Nome + " esta dormindo... zzz");
+    }
+
+    abstract void EmitirSom();
+}
+
+foreach (Animal a in zoologico)
+{
+    a.Dormir();
+}`,
+			false,
+		),
+		vf(
+			"Este construtor da Poção compila sem : base, porque o C# chama o Item sozinho quando a filha só preenche Curativa.",
+			`class Item
+{
+    Item(string nome, int preco)
+    {
+        Nome = nome;
+        Preco = preco;
+    }
+}
+
+class Pocao : Item
+{
+    int Curativa;
+
+    Pocao(string nome, int preco, int cura)
+    {
+        Curativa = cura;
     }
 }`,
 			false,
