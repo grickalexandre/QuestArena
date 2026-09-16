@@ -9,8 +9,9 @@ import (
 
 const (
 	herancaQuizPrefix = "seed-heranca-conta-"
-	herancaTitle      = "Quest 3 — Item, Animal e Conta Corrente"
-	herancaDesc       = "15 questões de 1 minuto: da herança à conta corrente (virtual/override, abstract, Animal e cheque especial)."
+	herancaTitle      = "Quest 3 — Herança até a oficina 6.1"
+	herancaDesc       = "15 certo ou errado: herança, classe abstrata, Laboratório A (Animal), Laboratório B (Conta) e construtor com : base. Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
+	timeLimitHeranca  = 180
 )
 
 func herancaPack() pack {
@@ -22,163 +23,47 @@ func herancaPack() pack {
 	}
 }
 
-// EnsureHerancaQuiz cria o quiz da aula (até Conta Corrente) se o professor ainda não o tiver.
+// EnsureHerancaQuiz cria o quiz da aula (até a oficina 6.1) se o professor ainda não o tiver.
 func EnsureHerancaQuiz(ctx context.Context, st store.Store, teacherID string) error {
 	return herancaPack().ensure(ctx, st, teacherID)
 }
 
+func vf(text string, certa bool) draftQuestion {
+	opts := []string{"Certo", "Errado"}
+	idx := 0
+	if !certa {
+		idx = 1
+	}
+	// Alterna a ordem dos botões para o colega do lado não copiar “o da esquerda”.
+	if len(text)%2 == 0 {
+		opts[0], opts[1] = opts[1], opts[0]
+		idx = 1 - idx
+	}
+	return draftQuestion{
+		text:         text,
+		options:      opts,
+		correctIndex: idx,
+		timeLimitSec: timeLimitHeranca,
+	}
+}
+
 func herancaQuestions() []draftQuestion {
 	return []draftQuestion{
-		{
-			text: "O que é herança em POO, nesta aula?",
-			options: []string{
-				"Copiar o código do pai em outro arquivo, sem relação",
-				"A classe filha recebe o que o pai já tem e pode acrescentar ou especializar",
-				"Proibir o filho de ter métodos novos",
-				"Criar um objeto sem usar classe",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Em C#, como se escreve “Poção herda de Item”?",
-			options: []string{
-				"class Pocao : Item",
-				"class Pocao extends Item",
-				"class Pocao implements Item",
-				"class Pocao -> Item",
-			},
-			correctIndex: 0,
-		},
-		{
-			text: "No RPG, o que o pai Item já traz para Poção, Espada e Armadura?",
-			options: []string{
-				"Só Curativa e Dano",
-				"Apenas o método Main",
-				"Nome, Preço, Usar() e Vender()",
-				"Só o preço da loja",
-			},
-			correctIndex: 2,
-		},
-		{
-			text: "Por que a herança sozinha não resolve o Usar() do RPG?",
-			options: []string{
-				"Todas as filhas herdariam a mesma mensagem “você usou…”",
-				"Porque C# não permite herança",
-				"Porque Item não pode ter Nome",
-				"Porque lista não existe em C#",
-			},
-			correctIndex: 0,
-		},
-		{
-			text: "O que significa virtual no método do pai?",
-			options: []string{
-				"O método fica privado",
-				"O pai autoriza os filhos a mudarem este método",
-				"A classe vira abstrata automaticamente",
-				"O método não pode ser chamado",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "O que significa override na classe filha?",
-			options: []string{
-				"A filha está reescrevendo o método do pai",
-				"A filha apaga a classe pai",
-				"Cria um novo objeto",
-				"Impede a herança",
-			},
-			correctIndex: 0,
-		},
-		{
-			text: "Qual par permite reescrever o método do pai corretamente?",
-			options: []string{
-				"static e final",
-				"private e public",
-				"virtual e override",
-				"new e class",
-			},
-			correctIndex: 2,
-		},
-		{
-			text: "O que faz base.Usar() dentro do override?",
-			options: []string{
-				"Executa também a versão do método do pai",
-				"Cria um novo Item",
-				"Impede o override",
-				"Apaga a classe pai",
-			},
-			correctIndex: 0,
-		},
-		{
-			text: "O que é polimorfismo nesta aula?",
-			options: []string{
-				"Ter várias classes sem nenhuma relação",
-				"Mesma ação (Usar) com efeitos diferentes conforme o objeto",
-				"Só usar variáveis public",
-				"Proibir herança",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Em Item item = new Pocao(); item.Usar(); qual Usar() roda?",
-			options: []string{
-				"Sempre o Usar do Item (rótulo da variável)",
-				"O Usar da Poção, porque o objeto real é Poção",
-				"Dá erro de compilação",
-				"Os dois automaticamente, sem usar base",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Se Item for abstract, o que acontece com new Item()?",
-			options: []string{
-				"Cria um Item genérico normalmente",
-				"Erro: classe abstrata não vira objeto sozinha",
-				"Cria um Item vazio em silêncio",
-				"Só funciona no Programiz",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Por que Animal é abstract no laboratório?",
-			options: []string{
-				"Não existe “animal genérico”: só cachorro, gato, papagaio…",
-				"C# exige Main em toda classe",
-				"EmitirSom não pode ter override",
-				"List não funciona com classes concretas",
-			},
-			correctIndex: 0,
-		},
-		{
-			text: "No foreach de List<Animal>, a.EmitirSom() late ou mia?",
-			options: []string{
-				"Sempre late, porque a lista é de Animal",
-				"Depende do objeto real: Cachorro late, Gato mia…",
-				"Dá erro porque Animal é abstract",
-				"Só funciona se fizer cast em todo mundo",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Ana tem conta corrente (saldo 50, limite 200). Sacar 200. O que acontece?",
-			options: []string{
-				"Negado, porque 200 > 50",
-				"Aceito: saldo fica −150 (usou o cheque especial)",
-				"Aceito, mas o limite some para sempre",
-				"A conta vira poupança automaticamente",
-			},
-			correctIndex: 1,
-		},
-		{
-			text: "Por que ((ContaCorrente)contaAna).Limite precisa de cast?",
-			options: []string{
-				"Porque Limite é abstract",
-				"Porque a variável é Conta e Limite só existe na corrente",
-				"Porque poupança também tem Limite",
-				"Porque decimal exige cast sempre",
-			},
-			correctIndex: 1,
-		},
+		vf("Na herança, a classe filha reaproveita o que o pai já tem (atributos e métodos) e só escreve o que é específico.", true),
+		vf("Se Poção herda de Item, ainda é preciso copiar de novo Nome, Preco e Vender() dentro da classe Poção.", false),
+		vf("A linha class Pocao : Item significa que Poção herda de Item.", true),
+		vf("Polimorfismo e herança são a mesma coisa: os dois nomes descrevem exatamente o mesmo conceito.", false),
+		vf("Polimorfismo, nesta aula, é a mesma ação (Usar) produzir efeitos diferentes conforme o objeto real: poção cura, espada ataca, armadura defende.", true),
+		vf("Em Item item = new Pocao(...); item.Usar(); o C# sempre executa o Usar do Item, nunca o da Poção.", false),
+		vf("Se Item for abstract, o comando new Item() cria um item genérico vazio e o programa segue.", false),
+		vf("A variável pode ser do tipo Item (o molde), mas o objeto criado com new precisa ser de uma classe concreta, como Poção ou Espada.", true),
+		vf("Um método abstract no pai (Usar, EmitirSom, Sacar) obriga cada filha concreta a escrever o próprio com override.", true),
+		vf("No Laboratório A, new Animal() é válido, porque Animal é o tipo da lista.", false),
+		vf("No foreach de List<Animal>, a.EmitirSom() late ou mia conforme o objeto real, sem precisar converter o tipo na hora de emitir o som.", true),
+		vf("No Laboratório B, uma conta corrente com saldo 50 e limite 200 aceita sacar 200; o saldo fica −150.", true),
+		vf("No Laboratório B, a poupança herda o limite da conta corrente; por isso, com saldo 50, ela também aceita sacar 200.", false),
+		vf("O construtor tem o mesmo nome da classe, não declara tipo de retorno e roda automaticamente quando aparece o new.", true),
+		vf("O : base(nome, preco) pode ser escrito como um método dentro das chaves do construtor da filha, na primeira linha: base(nome, preco);", false),
 	}
 }
 
