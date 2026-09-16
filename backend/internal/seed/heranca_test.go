@@ -45,7 +45,7 @@ func TestHerancaQuestions(t *testing.T) {
 			t.Errorf("q%d: must offer both Certo and Errado", i+1)
 		}
 		low := strings.ToLower(q.text)
-		for _, ban := range []string{"public", "private", "protected", "tempo de execução", "tostring", " invalidcast"} {
+		for _, ban := range []string{"public", "private", "protected", "tempo de execução", "tostring", " invalidcast", "indent", "identaç", "dentro das chaves", "abrir as chaves"} {
 			if strings.Contains(low, ban) {
 				t.Errorf("q%d: prova não cobre %q", i+1, ban)
 			}

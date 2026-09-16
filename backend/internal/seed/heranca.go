@@ -10,7 +10,7 @@ import (
 const (
 	herancaQuizPrefix = "seed-heranca-conta-"
 	herancaTitle      = "Quest 3 — Herança até a oficina 6.1"
-	herancaDesc       = "20 certo ou errado com trechos de C# da aula: herança, classe abstrata, Laboratório A (Animal), Laboratório B (Conta) e construtor com : base. Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
+	herancaDesc       = "Nova série: 20 certo ou errado com trechos de C# da aula (herança, classe abstrata, Laboratório A, Laboratório B e : base). Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
 	timeLimitHeranca  = 180
 )
 
@@ -52,53 +52,107 @@ func vf(text, code string, certa bool) draftQuestion {
 func herancaQuestions() []draftQuestion {
 	return []draftQuestion{
 		vf(
-			"Rex consegue usar Dormir() mesmo a classe Cachorro não tendo esse método escrito nela: ele vem da herança do Animal.",
+			"Mimi usa o atributo Nome mesmo a classe Gato não declarando Nome: isso é herança do Animal.",
 			`abstract class Animal
 {
     string Nome;
-
-    void Dormir()
-    {
-        Console.WriteLine(Nome + " esta dormindo... zzz");
-    }
-
     abstract void EmitirSom();
 }
 
-class Cachorro : Animal
+class Gato : Animal
 {
     override void EmitirSom()
     {
-        Console.WriteLine(Nome + " late: Au au!");
+        Console.WriteLine(Nome + " mia: Miau!");
     }
 }
 
-Cachorro rex = new Cachorro();
-rex.Nome = "Rex";
-rex.Dormir();`,
+Gato mimi = new Gato();
+mimi.Nome = "Mimi";
+mimi.EmitirSom();`,
 			true,
 		),
 		vf(
-			"Como Pocao só herda atributos, o método Vender() precisa ser copiado de novo dentro da classe Pocao.",
+			"A Espada precisa copiar o campo Nome dentro da própria classe, senão o objeto fica sem nome.",
 			`class Item
 {
     string Nome;
     double Preco;
-
-    void Vender()
-    {
-        Console.WriteLine("Vendeu " + Nome);
-    }
 }
 
-class Pocao : Item
+class Espada : Item
 {
-    int Cura;
-}`,
+    int Dano;
+}
+
+Espada e = new Espada();
+e.Nome = "Excalibur";
+e.Dano = 12;`,
 			false,
 		),
 		vf(
-			"A linha class ContaCorrente : Conta diz que a corrente herda de Conta — é um tipo de conta.",
+			"A declaração class Papagaio : Animal indica que Papagaio herda de Animal.",
+			`abstract class Animal
+{
+    string Nome;
+    abstract void EmitirSom();
+}
+
+class Papagaio : Animal
+{
+    override void EmitirSom()
+    {
+        Console.WriteLine(Nome + " fala: Ola!");
+    }
+}`,
+			true,
+		),
+		vf(
+			"Herdar de Item já faz a Espada atacar e a Poção curar, sem ninguém escrever override.",
+			`class Item
+{
+    string Nome;
+    void Usar()
+    {
+        Console.WriteLine("Voce usou " + Nome);
+    }
+}
+
+class Pocao : Item { }
+class Espada : Item { }`,
+			false,
+		),
+		vf(
+			"No trecho, i.Usar() imprime o ataque da Espada. Isso é polimorfismo: o objeto real escolhe o efeito.",
+			`abstract class Item
+{
+    abstract void Usar();
+}
+
+class Espada : Item
+{
+    override void Usar()
+    {
+        Console.WriteLine("Causou 12 de dano");
+    }
+}
+
+Item i = new Espada();
+i.Usar();`,
+			true,
+		),
+		vf(
+			"Polimorfismo é só o nome chique da herança: se a classe tem os dois pontos, o comportamento já muda sozinho.",
+			`class Item
+{
+    void Usar() { Console.WriteLine("usou"); }
+}
+class Pocao : Item { }
+class Espada : Item { }`,
+			false,
+		),
+		vf(
+			"Como Conta é abstract, new Conta() abre uma conta genérica no banco e o programa segue.",
 			`abstract class Conta
 {
     string Titular;
@@ -106,82 +160,18 @@ class Pocao : Item
     abstract void Sacar(decimal valor);
 }
 
-class ContaCorrente : Conta
-{
-    decimal Limite;
-    override void Sacar(decimal valor) { /* usa saldo + limite */ }
-}`,
-			true,
-		),
-		vf(
-			"Polimorfismo e herança são sinônimos: basta herdar para o Usar() já ter efeito diferente em cada filha.",
-			`class Item
-{
-    string Nome;
-    void Usar()
-    {
-        Console.WriteLine("Voce usou " + Nome + "!");
-    }
-}
-
-class Pocao : Item { }
-class Espada : Item { }
-
-Pocao p = new Pocao();
-p.Nome = "Pocao de Vida";
-Espada e = new Espada();
-e.Nome = "Excalibur";
-p.Usar();
-e.Usar();`,
+Conta x = new Conta();`,
 			false,
 		),
 		vf(
-			"Depois destas linhas, item.Usar() executa o Usar da Poção (cura), porque o objeto real é Poção.",
-			`abstract class Item
-{
-    abstract void Usar();
-}
-
-class Pocao : Item
-{
-    override void Usar()
-    {
-        Console.WriteLine("Curou 20 de vida");
-    }
-}
-
-Item item = new Pocao();
-item.Usar();`,
+			"A lista pode ser List<Animal> e guardar new Gato() e new Cachorro() ao mesmo tempo.",
+			`List<Animal> zoo = new List<Animal>();
+zoo.Add(new Gato());
+zoo.Add(new Cachorro());`,
 			true,
 		),
 		vf(
-			"Como a variável foi declarada como Item, o C# ignora o new Pocao e sempre roda só o Usar do molde Item.",
-			`Item item = new Pocao("Cura", 10);
-item.Usar();`,
-			false,
-		),
-		vf(
-			"Se Item for abstract, o comando new Item() cria um item genérico vazio e o programa segue.",
-			`abstract class Item
-{
-    string Nome;
-    abstract void Usar();
-}
-
-Item x = new Item();`,
-			false,
-		),
-		vf(
-			"Pode existir uma variável do tipo Item apontando para new Pocao(): o rótulo é o molde, o objeto é concreto.",
-			`abstract class Item { }
-class Pocao : Item { }
-
-Item pocao = new Pocao();
-// Item vazio = new Item();  // nao compila`,
-			true,
-		),
-		vf(
-			"Um método abstract no pai (Usar, EmitirSom ou Sacar) obriga cada filha concreta a escrever o próprio com override.",
+			"Se a classe concreta Cachorro esquecer o override de EmitirSom, o programa não compila.",
 			`abstract class Animal
 {
     abstract void EmitirSom();
@@ -189,197 +179,161 @@ Item pocao = new Pocao();
 
 class Cachorro : Animal
 {
-    override void EmitirSom()
-    {
-        Console.WriteLine("Au au!");
-    }
-}
-
-class Gato : Animal
-{
-    override void EmitirSom()
-    {
-        Console.WriteLine("Miau!");
-    }
+    // faltou override void EmitirSom()
 }`,
 			true,
 		),
 		vf(
-			"No Laboratório A, zoologico.Add(new Animal()) funciona, porque a lista é do tipo Animal.",
-			`abstract class Animal
+			"new ContaCorrente() é inválido pelo mesmo motivo de new Conta(): as duas classes são moldes abstract.",
+			`abstract class Conta
 {
-    abstract void EmitirSom();
+    abstract void Sacar(decimal valor);
 }
 
-List<Animal> zoologico = new List<Animal>();
-zoologico.Add(new Animal());`,
+class ContaCorrente : Conta
+{
+    decimal Limite;
+    override void Sacar(decimal valor) { }
+}
+
+Conta c = new ContaCorrente();`,
 			false,
 		),
 		vf(
-			"No foreach do zoológico, a.EmitirSom() late ou mia conforme o objeto real, sem converter o tipo na hora de emitir o som.",
-			`List<Animal> zoologico = new List<Animal>();
-zoologico.Add(new Cachorro());
-zoologico.Add(new Gato());
+			"No Laboratório A, Loro.EmitirSom() só funciona se a variável for Papagaio; se for Animal, o som some.",
+			`Animal loro = new Papagaio();
+loro.Nome = "Loro";
+loro.EmitirSom();`,
+			false,
+		),
+		vf(
+			"No Laboratório A, o mesmo comando a.EmitirSom() no papagaio fala e no gato mia: polimorfismo no zoológico.",
+			`List<Animal> zoo = new List<Animal>();
+zoo.Add(new Papagaio());
+zoo.Add(new Gato());
 
-foreach (Animal a in zoologico)
+foreach (Animal a in zoo)
 {
     a.EmitirSom();
 }`,
 			true,
 		),
 		vf(
-			"No trecho da conta corrente, o saque de 200 é aceito e o saldo fica -150, porque o disponível é saldo + limite.",
+			"No Laboratório B, com saldo 100 e limite 200, sacar 150 na conta corrente deixa o saldo em -50.",
 			`ContaCorrente cc = new ContaCorrente();
 cc.Titular = "Ana";
-cc.Saldo = 50;
+cc.Saldo = 100;
 cc.Limite = 200;
-cc.Sacar(200);`,
+cc.Sacar(150);`,
 			true,
 		),
 		vf(
-			"No Laboratório B, a poupança usa a mesma regra de saque da corrente, porque Sacar está declarado no pai Conta.",
+			"No Laboratório B, Limite mora na classe Conta; por isso a poupança também aceita cheque especial.",
 			`abstract class Conta
 {
     decimal Saldo;
     abstract void Sacar(decimal valor);
 }
 
-Conta poupanca = new ContaPoupanca();
-poupanca.Saldo = 50;
-poupanca.Sacar(200);`,
-			false,
-		),
-		vf(
-			"Ao executar new Pocao(...), o construtor do Item roda primeiro (por causa do : base) e só depois o da Poção.",
-			`class Item
+class ContaCorrente : Conta
 {
-    Item(string nome, double preco)
-    {
-        Console.WriteLine("Item nascendo");
-    }
-}
-
-class Pocao : Item
-{
-    Pocao(string nome, double preco, int cura)
-        : base(nome, preco)
-    {
-        Console.WriteLine("Pocao nascendo");
-    }
-}
-
-Pocao p = new Pocao("Cura", 10, 20);`,
-			true,
-		),
-		vf(
-			"O : base(nome, preco) pode ser escrito dentro das chaves do construtor da filha, na primeira linha, como se fosse um método.",
-			`class Pocao : Item
-{
-    Pocao(string nome, double preco, int cura)
-    {
-        base(nome, preco);
-        Cura = cura;
-    }
-}`,
-			false,
-		),
-		vf(
-			"No construtor do Cachorro, nome e idade passam no : base e a raça é gravada só no corpo da filha.",
-			`class Animal
-{
-    string Nome;
-    int Idade;
-
-    Animal(string nome, int idade)
-    {
-        Nome = nome;
-        Idade = idade;
-    }
-}
-
-class Cachorro : Animal
-{
-    string Raca;
-
-    Cachorro(string nome, int idade, string raca)
-        : base(nome, idade)
-    {
-        Raca = raca;
-    }
-}`,
-			true,
-		),
-		vf(
-			"Como nome e apelido são os dois texto, : base(apelido, nome) só inverte a ordem da chamada e os campos do herói ficam corretos.",
-			`class Personagem
-{
-    string Nome;
-    string Apelido;
-
-    Personagem(string nome, string apelido)
-    {
-        Nome = nome;
-        Apelido = apelido;
-    }
-}
-
-class Heroi : Personagem
-{
-    Heroi(string nome, string apelido) : base(apelido, nome)
-    {
-    }
-}
-
-Heroi h = new Heroi("Ana", "Falcao");`,
-			false,
-		),
-		vf(
-			"Depositar na poupança funciona sem a classe ContaPoupanca ter escrito esse método: ele vem da herança da Conta.",
-			`abstract class Conta
-{
-    decimal Saldo;
-
-    void Depositar(decimal valor)
-    {
-        Saldo = Saldo + valor;
-    }
-
-    abstract void Sacar(decimal valor);
+    decimal Limite;
+    override void Sacar(decimal valor) { /* saldo + limite */ }
 }
 
 class ContaPoupanca : Conta
 {
-    override void Sacar(decimal valor) { /* so se tiver saldo */ }
-}
-
-ContaPoupanca p = new ContaPoupanca();
-p.Depositar(200);`,
-			true,
-		),
-		vf(
-			"No foreach do zoológico, a.Dormir() também escolhe um texto diferente para cachorro e gato, do mesmo jeito que EmitirSom.",
-			`abstract class Animal
-{
-    string Nome;
-
-    void Dormir()
-    {
-        Console.WriteLine(Nome + " esta dormindo... zzz");
-    }
-
-    abstract void EmitirSom();
-}
-
-foreach (Animal a in zoologico)
-{
-    a.Dormir();
+    override void Sacar(decimal valor) { /* so o saldo */ }
 }`,
 			false,
 		),
 		vf(
-			"Este construtor da Poção compila sem : base, porque o C# chama o Item sozinho quando a filha só preenche Curativa.",
+			"Com saldo 100, a poupança recusa sacar 150, porque não há limite extra.",
+			`ContaPoupanca p = new ContaPoupanca();
+p.Titular = "Beto";
+p.Saldo = 100;
+p.Sacar(150);`,
+			true,
+		),
+		vf(
+			"O construtor tem o mesmo nome da classe, não declara tipo de retorno e é acionado pelo new.",
+			`class Carro
+{
+    string Modelo;
+    int Portas;
+
+    Carro(string modelo, int portas)
+    {
+        Modelo = modelo;
+        Portas = portas;
+    }
+}
+
+Carro c = new Carro("Fusca", 2);`,
+			true,
+		),
+		vf(
+			"No new Carro, a tela mostra primeiro as portas e só depois o veículo, porque o construtor da filha roda antes do pai.",
+			`class Veiculo
+{
+    Veiculo(string modelo)
+    {
+        Console.WriteLine("Veiculo: montando " + modelo);
+    }
+}
+
+class Carro : Veiculo
+{
+    Carro(string modelo, int portas) : base(modelo)
+    {
+        Console.WriteLine("Carro: colocando " + portas + " portas");
+    }
+}
+
+Carro c = new Carro("Fusca", 2);`,
+			false,
+		),
+		vf(
+			"Na linha do construtor, : base(modelo) manda só o que o pai precisa; as portas ficam no corpo do Carro.",
+			`class Carro : Veiculo
+{
+    int Portas;
+
+    Carro(string modelo, int portas) : base(modelo)
+    {
+        Portas = portas;
+    }
+}`,
+			true,
+		),
+		vf(
+			"Se Veiculo só tem construtor com modelo, o Carro não compila se faltar : base(modelo) na linha do construtor.",
+			`class Veiculo
+{
+    Veiculo(string modelo)
+    {
+        Modelo = modelo;
+    }
+}
+
+class Carro : Veiculo
+{
+    int Portas;
+
+    Carro(string modelo, int portas)
+    {
+        Portas = portas;
+    }
+}`,
+			true,
+		),
+		vf(
+			": base(preco, nome) neste Item(string nome, int preco) só troca a ordem, mas o programa aceita e grava certo.",
 			`class Item
 {
+    string Nome;
+    int Preco;
+
     Item(string nome, int preco)
     {
         Nome = nome;
@@ -389,11 +343,9 @@ foreach (Animal a in zoologico)
 
 class Pocao : Item
 {
-    int Curativa;
-
-    Pocao(string nome, int preco, int cura)
+    Pocao(string nome, int preco, int cura) : base(preco, nome)
     {
-        Curativa = cura;
+        Cura = cura;
     }
 }`,
 			false,
