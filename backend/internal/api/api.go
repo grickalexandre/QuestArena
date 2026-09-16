@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -158,6 +157,7 @@ func (s *Server) handleDevLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, err.Error())
 		return
 	}
+	seed.EnsureAll(r.Context(), s.Store, claims.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token": token,
 		"teacher": map[string]string{
@@ -187,6 +187,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "invalid token")
 		return
 	}
+	seed.EnsureAll(r.Context(), s.Store, claims.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"teacher": map[string]string{
 			"id":    claims.ID,
@@ -199,18 +200,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListQuizzes(w http.ResponseWriter, r *http.Request) {
 	teacher := auth.FromContext(r.Context())
-	if err := seed.EnsureHerancaQuiz(r.Context(), s.Store, teacher.ID); err != nil {
-		log.Printf("seed heranca quiz: %v", err)
-	}
-	if err := seed.EnsureNodeSupabaseQuiz(r.Context(), s.Store, teacher.ID); err != nil {
-		log.Printf("seed node+supabase quiz: %v", err)
-	}
-	if err := seed.EnsureMerQuiz(r.Context(), s.Store, teacher.ID); err != nil {
-		log.Printf("seed mer quiz: %v", err)
-	}
-	if err := seed.EnsureArquiteturaQuiz(r.Context(), s.Store, teacher.ID); err != nil {
-		log.Printf("seed analise-arquitetura quiz: %v", err)
-	}
+	seed.EnsureAll(r.Context(), s.Store, teacher.ID)
 	list, err := s.Store.ListQuizzes(r.Context(), teacher.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())

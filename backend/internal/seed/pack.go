@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"log"
 	"slices"
 
 	"github.com/questarena/questarena/internal/models"
@@ -148,4 +149,23 @@ func (p pack) ensure(ctx context.Context, st store.Store, teacherID string) erro
 		}
 	}
 	return nil
+}
+
+// EnsureAll writes the built-in classroom quizzes for this teacher (create or refresh).
+func EnsureAll(ctx context.Context, st store.Store, teacherID string) {
+	if teacherID == "" {
+		return
+	}
+	if err := EnsureHerancaQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed heranca quiz: %v", err)
+	}
+	if err := EnsureNodeSupabaseQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed node+supabase quiz: %v", err)
+	}
+	if err := EnsureMerQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed mer quiz: %v", err)
+	}
+	if err := EnsureArquiteturaQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed analise-arquitetura quiz: %v", err)
+	}
 }
