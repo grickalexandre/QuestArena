@@ -28,6 +28,12 @@ func TestHerancaQuestions(t *testing.T) {
 		if q.timeLimitSec != timeLimitHeranca {
 			t.Errorf("q%d: want %ds (sem corrida de XP), got %ds", i+1, timeLimitHeranca, q.timeLimitSec)
 		}
+		if q.code == "" {
+			t.Errorf("q%d: expected C# snippet for classroom context", i+1)
+		}
+		if models.NormalizeCodeLanguage(q.codeLanguage) != "csharp" {
+			t.Errorf("q%d: want csharp snippet, got %q", i+1, q.codeLanguage)
+		}
 		seen := map[string]bool{}
 		for j, opt := range q.options {
 			if opt != "Certo" && opt != "Errado" {
@@ -141,6 +147,9 @@ func TestEnsureHerancaRewritesOutdatedQuestions(t *testing.T) {
 		}
 		if q.Text != want.text {
 			t.Errorf("question 1 not restored: got %q", q.Text)
+		}
+		if q.CodeSnippet != want.code {
+			t.Errorf("question 1 snippet not restored")
 		}
 		if q.ID != stale.ID {
 			t.Errorf("should keep id %q, got %q", stale.ID, q.ID)
