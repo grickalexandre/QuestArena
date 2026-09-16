@@ -4,12 +4,10 @@ import Credits from '../../components/Credits'
 import { useAuth } from '../../lib/auth'
 
 export default function TeacherLoginPage() {
-  const { login, register, teacher, loading, authMode } = useAuth()
+  const { login, teacher, loading, authMode } = useAuth()
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -20,8 +18,7 @@ export default function TeacherLoginPage() {
     setError('')
     setBusy(true)
     try {
-      if (mode === 'login') await login(email, password)
-      else await register(email, password, name)
+      await login(email, password)
       nav('/teacher')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na autenticação')
@@ -36,17 +33,11 @@ export default function TeacherLoginPage() {
         <Link to="/" className="brand-link">
           QuestArena
         </Link>
-        <h1>{mode === 'login' ? 'Entrar como professor' : 'Criar conta'}</h1>
+        <h1>Entrar como professor</h1>
         <p className="muted">
           Modo: <strong>{authMode ?? '...'}</strong>
           {authMode === 'dev' ? ' — login local sem Firebase' : ''}
         </p>
-        {mode === 'register' && (
-          <label>
-            Nome
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
-          </label>
-        )}
         <label>
           E-mail
           <input
@@ -54,7 +45,7 @@ export default function TeacherLoginPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="prof@escola.com"
+            placeholder="oliveiraalexandre1972@gmail.com"
           />
         </label>
         <label>
@@ -70,14 +61,7 @@ export default function TeacherLoginPage() {
         </label>
         {error && <p className="error">{error}</p>}
         <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Registrar'}
-        </button>
-        <button
-          type="button"
-          className="linkish"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-        >
-          {mode === 'login' ? 'Criar nova conta' : 'Já tenho conta'}
+          {busy ? 'Aguarde...' : 'Entrar'}
         </button>
         <Credits compact />
       </form>

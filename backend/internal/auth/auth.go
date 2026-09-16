@@ -20,7 +20,14 @@ import (
 
 type ContextKey string
 
-const UserContextKey ContextKey = "teacher"
+const (
+	UserContextKey      ContextKey = "teacher"
+	AllowedTeacherEmail            = "oliveiraalexandre1972@gmail.com"
+)
+
+func IsAllowedTeacherEmail(email string) bool {
+	return strings.EqualFold(strings.TrimSpace(email), AllowedTeacherEmail)
+}
 
 type TeacherClaims struct {
 	ID    string
@@ -55,6 +62,9 @@ func (f *FirebaseVerifier) Verify(ctx context.Context, token string) (*TeacherCl
 		return nil, err
 	}
 	email, _ := tok.Claims["email"].(string)
+	if !IsAllowedTeacherEmail(email) {
+		return nil, fmt.Errorf("somente o professor autorizado pode entrar")
+	}
 	name, _ := tok.Claims["name"].(string)
 	if name == "" {
 		name = strings.Split(email, "@")[0]
@@ -113,6 +123,9 @@ func (d *DevVerifier) DevLogin(ctx context.Context, email, password, name string
 	if email == "" || password == "" {
 		return "", nil, fmt.Errorf("email and password required")
 	}
+	if !IsAllowedTeacherEmail(email) {
+		return "", nil, fmt.Errorf("somente o professor autorizado pode entrar")
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	u, ok := d.users[email]
@@ -151,6 +164,9 @@ func (d *DevVerifier) Verify(ctx context.Context, token string) (*TeacherClaims,
 	}
 	u := d.users[email]
 	d.mu.RUnlock()
+	if !IsAllowedTeacherEmail(u.Email) {
+		return nil, fmt.Errorf("somente o professor autorizado pode entrar")
+	}
 	return &TeacherClaims{ID: u.ID, Email: u.Email, Name: u.Name}, nil
 }
 
