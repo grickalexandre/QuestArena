@@ -70,6 +70,7 @@ type Player struct {
 	conn         *Client
 	answered     bool
 	choice       int
+	forfeited    bool
 }
 
 type answerRecord struct {
@@ -424,6 +425,7 @@ func playerStatePayload(room *Room, player *Player) map[string]any {
 		"phase":     room.Phase,
 		"answered":  player.answered,
 		"choice":    player.choice,
+		"forfeited": player.forfeited,
 		"score":     player.Score,
 	}
 	if room.Phase == PhaseQuestion || room.Phase == PhaseReveal {
@@ -495,6 +497,7 @@ func (c *Client) handleNext() {
 func (c *Client) handlePresence(data json.RawMessage) {
 	var req struct {
 		Hidden  *bool `json:"hidden"`
+		Idle    bool  `json:"idle"`
 		Inspect *bool `json:"inspect"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
@@ -519,12 +522,19 @@ func (c *Client) handlePresence(data json.RawMessage) {
 	}
 	changed := false
 	if req.Hidden != nil && player.Hidden != *req.Hidden {
-		player.Hidden = *req.Hidden
-		if *req.Hidden && room.Phase == PhaseQuestion {
-			player.AwayCount++
-			player.AwayTotal++
+		idle := req.Idle && *req.Hidden
+		if idle {
+			// Phone sleep / screen lock: keep the question, do not flag a leave.
+			changed = false
+		} else {
+			player.Hidden = *req.Hidden
+			if *req.Hidden && room.Phase == PhaseQuestion {
+				player.AwayCount++
+				player.AwayTotal++
+				room.forfeitPlayerLocked(player, "left_screen")
+			}
+			changed = true
 		}
-		changed = true
 	}
 	if req.Inspect != nil && player.Inspecting != *req.Inspect {
 		player.Inspecting = *req.Inspect
@@ -665,6 +675,35 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 	})
 }
 
+func (r *Room) forfeitPlayerLocked(player *Player, reason string) {
+	if r.Phase != PhaseQuestion || player == nil || player.answered {
+		return
+	}
+	if _, ok := r.Answers[player.ID]; ok {
+		return
+	}
+	player.answered = true
+	player.choice = -1
+	player.forfeited = true
+	r.Answers[player.ID] = answerRecord{
+		playerID: player.ID,
+		choice:   -1,
+		elapsed:  time.Since(r.QuestionAt),
+		correct:  false,
+		points:   0,
+	}
+	if player.conn != nil {
+		player.conn.emit("question_forfeit", map[string]any{
+			"reason":  reason,
+			"message": "Você saiu da tela e perdeu esta questão.",
+		})
+	}
+	r.broadcastLocked("answer_count", map[string]any{
+		"answered": countAnsweredConnected(r),
+		"total":    countConnected(r),
+	})
+}
+
 func calcScore(weight float64, timeLimitSec int, elapsed time.Duration) int {
 	if weight <= 0 {
 		weight = 1
@@ -705,9 +744,18 @@ func countAnsweredConnected(room *Room) int {
 func (r *Room) startQuestionLocked() {
 	r.cancelTimersLocked()
 	r.Answers = make(map[string]answerRecord)
+	q := r.Questions[r.CurrentIndex]
+	limit := q.TimeLimitSec
+	if limit <= 0 {
+		limit = 60
+	}
+	r.Phase = PhaseQuestion
+	r.QuestionAt = time.Now()
+	r.Deadline = r.QuestionAt.Add(time.Duration(limit) * time.Second)
 	for _, p := range r.Players {
 		p.answered = false
 		p.choice = -1
+		p.forfeited = false
 		p.AwayCount = 0
 		p.InspectCount = 0
 		if p.Hidden || p.conn == nil {
@@ -718,14 +766,6 @@ func (r *Room) startQuestionLocked() {
 			p.InspectCount++
 		}
 	}
-	q := r.Questions[r.CurrentIndex]
-	limit := q.TimeLimitSec
-	if limit <= 0 {
-		limit = 60
-	}
-	r.Phase = PhaseQuestion
-	r.QuestionAt = time.Now()
-	r.Deadline = r.QuestionAt.Add(time.Duration(limit) * time.Second)
 
 	r.broadcastLocked("question", map[string]any{
 		"question":  publicQuestion(r),
@@ -733,6 +773,11 @@ func (r *Room) startQuestionLocked() {
 		"endsAt":    r.Deadline.UTC().Format(time.RFC3339Nano),
 		"players":   publicPlayers(r),
 	})
+	for _, p := range r.Players {
+		if p.Hidden {
+			r.forfeitPlayerLocked(p, "left_screen")
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	r.timerCancel = cancel
@@ -1009,6 +1054,7 @@ func publicPlayers(r *Room) []map[string]any {
 			"awayTotal":    p.AwayTotal,
 			"inspecting":   p.Inspecting,
 			"inspectCount": p.InspectCount,
+			"forfeited":    p.forfeited,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

@@ -20,6 +20,7 @@ type Player = {
   awayTotal?: number
   inspecting?: boolean
   inspectCount?: number
+  forfeited?: boolean
 }
 type PublicQuestion = {
   id: string
@@ -505,7 +506,14 @@ function playerChipNote(p: Player) {
     return <span className="inspect-note"> · inspecionando</span>
   }
   if (p.hidden) {
-    return <span className="away-note"> · fora da tela</span>
+    return (
+      <span className="away-note">
+        {p.forfeited ? ' · fora da tela — perdeu a questão' : ' · fora da tela'}
+      </span>
+    )
+  }
+  if (p.forfeited) {
+    return <span className="flag-note"> · perdeu a questão</span>
   }
   if ((p.inspectCount || 0) > 0) {
     return <span className="inspect-note"> · F12 {p.inspectCount}x</span>

@@ -60,6 +60,7 @@ type JoinedPayload = {
   avatar?: number
   phase?: 'lobby' | 'question' | 'reveal' | 'finished'
   answered?: boolean
+  forfeited?: boolean
   choice?: number
   answerText?: string
   question?: PublicQuestion
@@ -126,7 +127,8 @@ export default function PlayPage() {
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
   const [leftThisQuestion, setLeftThisQuestion] = useState(false)
-  const away = usePlayPresence(send, phase !== 'join')
+  const [forfeitMessage, setForfeitMessage] = useState('')
+  usePlayPresence(send, phase !== 'join', question?.id ?? '')
   const inspecting = usePlayAntiInspect(send, phase !== 'join')
   const remaining = useCountdown(endsAt)
   const timerPct = useMemo(() => {
@@ -145,16 +147,13 @@ export default function PlayPage() {
     return () => clearTimeout(id)
   }, [autoNextIn])
 
-  useEffect(() => {
-    if (phase === 'question' && away) setLeftThisQuestion(true)
-  }, [phase, away])
-
   function applyQuestion(
     q: PublicQuestion,
     endsAtIso?: string,
     alreadyAnswered?: boolean,
     choice?: number,
     answerText?: string,
+    forfeited?: boolean,
   ) {
     setQuestion({
       ...q,
@@ -164,7 +163,7 @@ export default function PlayPage() {
     setSelected(typeof choice === 'number' && choice >= 0 ? choice : null)
     setEssayDraft(answerText || '')
     setSubmittedText(answerText || '')
-    setLocked(!!alreadyAnswered)
+    setLocked(!!alreadyAnswered || !!forfeited)
     setCorrectIndex(null)
     setExpectedAnswer('')
     setExpectedAnswers([])
@@ -172,7 +171,8 @@ export default function PlayPage() {
     setLastSimilarity(null)
     setLastCorrect(null)
     setAutoNextIn(null)
-    setLeftThisQuestion(false)
+    setLeftThisQuestion(!!forfeited)
+    setForfeitMessage(forfeited ? 'Você saiu da tela e perdeu esta questão.' : '')
   }
 
   function applyResult(d: QuestionResult, id: string) {
@@ -225,7 +225,7 @@ export default function PlayPage() {
         const nextPhase = d.phase || 'lobby'
         if (nextPhase === 'question' && d.question) {
           setPhase('question')
-          applyQuestion(d.question, d.endsAt, d.answered, d.choice, d.answerText)
+          applyQuestion(d.question, d.endsAt, d.answered, d.choice, d.answerText, d.forfeited)
         } else if (nextPhase === 'reveal' && d.question) {
           applyQuestion(d.question, d.endsAt, true, d.choice)
           if (d.questionResult) applyResult(d.questionResult, d.playerId)
@@ -246,6 +246,12 @@ export default function PlayPage() {
       }),
       on('answer_ack', () => {
         setLocked(true)
+      }),
+      on('question_forfeit', (data) => {
+        const msg = (data as { message?: string }).message
+        setLocked(true)
+        setLeftThisQuestion(true)
+        setForfeitMessage(msg || 'Você saiu da tela e perdeu esta questão.')
       }),
       on('question_result', (data) => {
         applyResult(data as QuestionResult, credsRef.current.playerId)
@@ -456,7 +462,7 @@ export default function PlayPage() {
           )}
           {phase === 'question' && leftThisQuestion && (
             <p className="error banner away-warn">
-              Você saiu da tela. O professor foi avisado.
+              {forfeitMessage || 'Você saiu da tela e perdeu esta questão.'}
             </p>
           )}
 

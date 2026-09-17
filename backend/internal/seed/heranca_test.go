@@ -26,7 +26,7 @@ func TestHerancaQuestions(t *testing.T) {
 			t.Errorf("q%d: correctIndex %d out of range", i+1, q.correctIndex)
 		}
 		if q.timeLimitSec != timeLimitHeranca {
-			t.Errorf("q%d: want %ds (sem corrida de XP), got %ds", i+1, timeLimitHeranca, q.timeLimitSec)
+			t.Errorf("q%d: want %ds, got %ds", i+1, timeLimitHeranca, q.timeLimitSec)
 		}
 		if q.code == "" {
 			t.Errorf("q%d: expected C# snippet for classroom context", i+1)

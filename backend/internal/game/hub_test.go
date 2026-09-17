@@ -138,6 +138,114 @@ func TestPresenceCountsAwayOnlyOnQuestion(t *testing.T) {
 	}
 }
 
+func TestIdlePresenceDoesNotForfeitQuestion(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B"}, CorrectIndex: 0, Weight: 1000, TimeLimitSec: 60,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{hub: h, send: make(chan []byte, 32)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+
+	idleHide, _ := json.Marshal(map[string]any{"hidden": true, "idle": true})
+	c.handlePresence(idleHide)
+
+	var player *Player
+	for _, p := range room.Players {
+		player = p
+	}
+	if player.Hidden || player.answered || player.forfeited || player.AwayCount != 0 {
+		t.Fatalf("idle lock must keep the question: hidden=%v answered=%v forfeited=%v away=%d", player.Hidden, player.answered, player.forfeited, player.AwayCount)
+	}
+	if _, ok := room.Answers[player.ID]; ok {
+		t.Fatal("idle lock recorded an answer")
+	}
+}
+
+func TestLeaveScreenForfeitsUnansweredQuestion(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B"}, CorrectIndex: 0, Weight: 1000, TimeLimitSec: 60,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{hub: h, send: make(chan []byte, 32)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+
+	hidden, _ := json.Marshal(map[string]any{"hidden": true, "idle": false})
+	c.handlePresence(hidden)
+
+	var player *Player
+	for _, p := range room.Players {
+		player = p
+	}
+	if !player.forfeited || !player.answered || player.Score != 0 {
+		t.Fatalf("leave must forfeit: forfeited=%v answered=%v score=%d", player.forfeited, player.answered, player.Score)
+	}
+	ans, ok := room.Answers[player.ID]
+	if !ok || ans.correct || ans.points != 0 {
+		t.Fatalf("forfeit answer: ok=%v %+v", ok, ans)
+	}
+
+	answer, _ := json.Marshal(map[string]any{"choice": 0})
+	c.handleAnswer(answer)
+	if room.Answers[player.ID].correct {
+		t.Fatal("forfeit must lock out a later correct answer")
+	}
+}
+
+func TestLeaveDoesNotOverwriteSubmittedAnswer(t *testing.T) {
+	h := NewHub(store.NewMemoryStore())
+	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{
+		ID: "1", Text: "Q", Options: []string{"A", "B"}, CorrectIndex: 0, Weight: 1000, TimeLimitSec: 60,
+	}}, "teacher-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{hub: h, send: make(chan []byte, 32)}
+	joinPayload, _ := json.Marshal(map[string]any{
+		"pin": room.PIN, "nickname": "Ana", "ra": "RA123", "avatar": 1,
+	})
+	c.handlePlayerJoin(joinPayload)
+
+	room.mu.Lock()
+	room.startQuestionLocked()
+	room.mu.Unlock()
+
+	answer, _ := json.Marshal(map[string]any{"choice": 0})
+	c.handleAnswer(answer)
+	hidden, _ := json.Marshal(map[string]any{"hidden": true})
+	c.handlePresence(hidden)
+
+	var player *Player
+	for _, p := range room.Players {
+		player = p
+	}
+	if player.forfeited {
+		t.Fatal("already submitted answer should not be forfeited")
+	}
+	if !room.Answers[player.ID].correct || room.Answers[player.ID].points <= 0 {
+		t.Fatalf("submitted answer lost: %+v", room.Answers[player.ID])
+	}
+}
+
 func TestPlayerCannotChangeAnswerAfterSubmit(t *testing.T) {
 	h := NewHub(store.NewMemoryStore())
 	room, err := h.CreateRoom(models.Quiz{ID: "q1", Title: "Quiz"}, []models.Question{{

@@ -10,8 +10,8 @@ import (
 const (
 	herancaQuizPrefix = "seed-heranca-conta-"
 	herancaTitle      = "Quest 3 — Herança até a oficina 6.1"
-	herancaDesc       = "Nova série: 20 certo ou errado com trechos de C# da aula (herança, classe abstrata, Laboratório A, Laboratório B e : base). Sem public/private/protected. Tempo folgado — a nota vale pelo acerto, não pela corrida de XP."
-	timeLimitHeranca  = 180
+	herancaDesc       = "Nova série: 20 certo ou errado com trechos de C# da aula (herança, classe abstrata, Laboratório A, Laboratório B e : base). Sem public/private/protected. 1 minuto por questão."
+	timeLimitHeranca  = 60
 )
 
 func herancaPack() pack {
