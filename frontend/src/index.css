@@ -1286,6 +1286,39 @@ label {
 
 /* ---------- Código formatado ---------- */
 
+.question-der {
+  margin: 0.7rem auto 1rem;
+  padding: 0.55rem 0.65rem 0.45rem;
+  max-width: 860px;
+  background: rgba(4, 10, 20, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow-x: auto;
+}
+
+.question-der-inner svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+}
+
+.question-der figcaption {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .question-der {
+    padding: 0.4rem;
+  }
+  .question-der-inner svg {
+    max-height: 220px;
+  }
+}
+
 .code-block,
 .code-editor {
   --code-font: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;

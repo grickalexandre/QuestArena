@@ -20,6 +20,7 @@ type draftQuestion struct {
 	correctIndex    int
 	code            string
 	codeLanguage    string
+	diagram         string
 	expectedAnswer  string
 	expectedAnswers []string
 	keyTerms        []string
@@ -39,12 +40,18 @@ func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
 		Options:      append([]string{}, d.options...),
 		CorrectIndex: d.correctIndex,
 		CodeSnippet:  d.code,
+		DiagramSvg:   d.diagram,
 		Weight:       1,
 		TimeLimitSec: limit,
 		Order:        order,
 	}
 	if d.code != "" {
 		q.CodeLanguage = models.NormalizeCodeLanguage(d.codeLanguage)
+	}
+	if d.diagram != "" {
+		if svg, err := models.SanitizeDiagramSVG(d.diagram); err == nil {
+			q.DiagramSvg = svg
+		}
 	}
 	if d.expectedAnswer != "" {
 		q.Type = models.QuestionEssay
@@ -75,6 +82,7 @@ func sameContent(a, b *models.Question) bool {
 		a.CorrectIndex == b.CorrectIndex &&
 		a.CodeSnippet == b.CodeSnippet &&
 		a.CodeLanguage == b.CodeLanguage &&
+		a.DiagramSvg == b.DiagramSvg &&
 		a.Weight == b.Weight &&
 		a.TimeLimitSec == b.TimeLimitSec &&
 		a.ExpectedAnswer == b.ExpectedAnswer &&

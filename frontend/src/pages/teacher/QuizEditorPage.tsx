@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
+import QuestionDiagram from '../../components/QuestionDiagram'
 import CodeEditor from '../../components/CodeEditor'
 import { api, type Question, type QuestionType, type Quiz } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -523,6 +524,7 @@ export default function QuizEditorPage() {
                   {q.type === 'essay' && q.expectedAnswer && (
                     <p className="q-expected-preview">Ref.: {previewText(q.expectedAnswer)}</p>
                   )}
+                  {q.diagramSvg && <QuestionDiagram svg={q.diagramSvg} />}
                   {q.codeSnippet && (
                     <CodeBlock
                       code={q.codeSnippet}

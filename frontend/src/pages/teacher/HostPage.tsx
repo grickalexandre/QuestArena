@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
+import QuestionDiagram from '../../components/QuestionDiagram'
 import { avatarEmoji } from '../../lib/avatars'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -29,6 +30,7 @@ type PublicQuestion = {
   options?: string[]
   codeSnippet?: string
   codeLanguage?: string
+  diagramSvg?: string
   weight: number
   timeLimitSec: number
   index: number
@@ -329,6 +331,8 @@ export default function HostPage() {
             )}
           </div>
           <h2>{question.text}</h2>
+
+          <QuestionDiagram svg={question.diagramSvg} />
 
           {question.codeSnippet && (
             <CodeBlock code={question.codeSnippet} language={question.codeLanguage} />

@@ -797,6 +797,7 @@ func publicQuestion(r *Room) models.PublicQuestion {
 		Options:      q.Options,
 		CodeSnippet:  q.CodeSnippet,
 		CodeLanguage: q.CodeLanguage,
+		DiagramSvg:   q.DiagramSvg,
 		Weight:       q.Weight,
 		TimeLimitSec: limit,
 		Index:        r.CurrentIndex,

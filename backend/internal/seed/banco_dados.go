@@ -48,6 +48,12 @@ func enadeSQL(text, code string, options []string, correct int) draftQuestion {
 	return q
 }
 
+func enadeDER(text, svg string, options []string, correct int) draftQuestion {
+	q := enadeMC(text, options, correct)
+	q.diagram = strings.TrimSpace(svg)
+	return q
+}
+
 func bancoDadosQuestions() []draftQuestion {
 	return []draftQuestion{
 		enadeSQL(
@@ -66,8 +72,9 @@ INNER JOIN FUNCIONARIOS
 			},
 			3,
 		),
-		enadeMC(
-			"[ENADE 2011 · Q23] DER mapeado para o relacional em 3FN. Restrições: Ent1 N:N Ent2; Ent2 1:0..N Ent3 (fraca); Ent1 0..1:0..N Ent5 (fraca); Ent3 N:N Ent4. A PK de Ent1 tem dois atributos; Ent3 e Ent5 são fracas.\n\nQuantas colunas implementam chaves estrangeiras (não o número de relacionamentos)?",
+		enadeDER(
+			"[ENADE 2011 · Q23] Use o DER abaixo (forte = retângulo; fraca = cantos arredondados; PK no topo). Mapeie para o relacional em 3FN.\n\nQuantas colunas implementam chaves estrangeiras (não o número de relacionamentos)?",
+			derEntidades2011,
 			[]string{
 				"6 colunas (uma FK simples por relacionamento, mais duas extras)",
 				"7 colunas (esqueceu que a PK de Ent1 tem dois atributos)",
@@ -76,8 +83,9 @@ INNER JOIN FUNCIONARIOS
 			},
 			3,
 		),
-		enadeMC(
-			"[ENADE 2017 · item 34] Diálogo e DER Pessoa–Cavalo. Pessoa (0..1) possui Cavalo (1). rg é atributo descritivo, não identificador.\n\nI. As pessoas do diálogo podem ser cadastradas na entidade Pessoa.\nII. Cada uma delas pode ter mais de um cavalo cadastrado.\nIII. O atributo rg de Pessoa pode exercer o papel de chave primária.\nIV. Todo cavalo deve ter no mínimo uma pessoa; uma pessoa pode ser cadastrada sem cavalo.\n\nÉ correto apenas o que se afirma em",
+		enadeDER(
+			"[ENADE 2017 · item 34] Diálogo + DER Pessoa–Cavalo. rg é atributo descritivo, não identificador.\n\nI. As pessoas do diálogo podem ser cadastradas na entidade Pessoa.\nII. Cada uma delas pode ter mais de um cavalo cadastrado.\nIII. O atributo rg de Pessoa pode exercer o papel de chave primária.\nIV. Todo cavalo deve ter no mínimo uma pessoa; uma pessoa pode ser cadastrada sem cavalo.\n\nÉ correto apenas o que se afirma em",
+			derPessoaCavalo2017,
 			[]string{
 				"I e II.",
 				"I e IV.",

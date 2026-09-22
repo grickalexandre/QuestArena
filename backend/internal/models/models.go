@@ -41,6 +41,7 @@ type Question struct {
 	SimilarityThreshold float64      `json:"similarityThreshold" firestore:"similarityThreshold"`
 	CodeSnippet         string       `json:"codeSnippet" firestore:"codeSnippet"`
 	CodeLanguage        string       `json:"codeLanguage" firestore:"codeLanguage"`
+	DiagramSvg          string       `json:"diagramSvg,omitempty" firestore:"diagramSvg,omitempty"`
 	Weight              float64      `json:"weight" firestore:"weight"`
 	TimeLimitSec        int          `json:"timeLimitSec" firestore:"timeLimitSec"`
 	Order               int          `json:"order" firestore:"order"`
@@ -55,6 +56,7 @@ type PublicQuestion struct {
 	Options      []string     `json:"options,omitempty"`
 	CodeSnippet  string       `json:"codeSnippet,omitempty"`
 	CodeLanguage string       `json:"codeLanguage,omitempty"`
+	DiagramSvg   string       `json:"diagramSvg,omitempty"`
 	Weight       float64      `json:"weight"`
 	TimeLimitSec int          `json:"timeLimitSec"`
 	Index        int          `json:"index"`

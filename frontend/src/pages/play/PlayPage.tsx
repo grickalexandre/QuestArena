@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import Credits from '../../components/Credits'
 import CodeBlock from '../../components/CodeBlock'
+import QuestionDiagram from '../../components/QuestionDiagram'
 import { AVATARS, avatarEmoji } from '../../lib/avatars'
 import { useGameSocket } from '../../lib/useGameSocket'
 import { usePlayAntiInspect } from '../../lib/usePlayAntiInspect'
@@ -17,6 +18,7 @@ type PublicQuestion = {
   options?: string[]
   codeSnippet?: string
   codeLanguage?: string
+  diagramSvg?: string
   weight: number
   timeLimitSec: number
   index: number
@@ -467,6 +469,8 @@ export default function PlayPage() {
           )}
 
           <h2>{question.text}</h2>
+
+          <QuestionDiagram svg={question.diagramSvg} />
 
           {question.codeSnippet && (
             <CodeBlock code={question.codeSnippet} language={question.codeLanguage} />

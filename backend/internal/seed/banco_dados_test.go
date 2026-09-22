@@ -47,6 +47,9 @@ func TestBancoDadosQuestions(t *testing.T) {
 		if q.TimeLimitSec != 120 {
 			t.Errorf("q%d: toQuestion time %d", i+1, q.TimeLimitSec)
 		}
+		if q.DiagramSvg != d.diagram && d.diagram != "" && q.DiagramSvg == "" {
+			t.Errorf("q%d: diagram was dropped", i+1)
+		}
 		if strings.HasPrefix(d.text, "[ENADE") {
 			official++
 		}
@@ -56,6 +59,12 @@ func TestBancoDadosQuestions(t *testing.T) {
 			joined.WriteString(strings.ToLower(opt))
 			joined.WriteByte(' ')
 		}
+	}
+	if !strings.Contains(qs[1].diagram, "Ent5") || !strings.Contains(qs[1].diagram, "<svg") {
+		t.Error("Q23 must include the Ent1–Ent5 DER drawing")
+	}
+	if !strings.Contains(qs[2].diagram, "Pessoa") || !strings.Contains(qs[2].diagram, "Cavalo") {
+		t.Error("item 34 must include the Pessoa–Cavalo DER drawing")
 	}
 	if official < 5 {
 		t.Errorf("want at least 5 official/reconstructed ENADE items, got %d", official)

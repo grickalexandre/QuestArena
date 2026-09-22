@@ -26,6 +26,7 @@ export type Question = {
   similarityThreshold?: number
   codeSnippet?: string
   codeLanguage?: string
+  diagramSvg?: string
   weight: number
   timeLimitSec: number
   order: number

@@ -522,6 +522,11 @@ func validateQuestion(q *models.Question) error {
 		}
 		q.CodeLanguage = models.NormalizeCodeLanguage(q.CodeLanguage)
 	}
+	svg, err := models.SanitizeDiagramSVG(q.DiagramSvg)
+	if err != nil {
+		return &simpleError{err.Error()}
+	}
+	q.DiagramSvg = svg
 	switch q.Type {
 	case models.QuestionEssay:
 		q.NormalizeEssayRefs()
