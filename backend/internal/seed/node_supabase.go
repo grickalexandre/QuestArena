@@ -10,7 +10,8 @@ import (
 const (
 	nodeSupabaseQuizPrefix = "seed-node-supabase-"
 	nodeSupabaseTitle      = "Quest 4 — Node.js + Supabase: do zero ao CRUD"
-	nodeSupabaseDesc       = "15 questões de 1 minuto sobre o material Node.js + Supabase: conceitos, SQL, policies, async/await e a API Express."
+	nodeSupabaseDesc       = "30 questões de 1 min 30 s sobre o material Node.js + Supabase: conceitos, SQL, policies, async/await, API Express e a tela. Sair da tela perde a questão."
+	timeLimitNodeSupabase  = 90
 )
 
 func nodeSupabasePack() pack {
@@ -32,228 +33,369 @@ func IsNodeSupabaseSeedQuiz(quizID string) bool {
 	return strings.HasPrefix(quizID, nodeSupabaseQuizPrefix)
 }
 
+func nq(text string, options []string, correct int) draftQuestion {
+	return draftQuestion{
+		text:         text,
+		options:      options,
+		correctIndex: correct,
+		timeLimitSec: timeLimitNodeSupabase,
+	}
+}
+
+func nqCode(text, code, lang string, options []string, correct int) draftQuestion {
+	q := nq(text, options, correct)
+	q.code = code
+	q.codeLanguage = lang
+	return q
+}
+
 func nodeSupabaseQuestions() []draftQuestion {
 	return []draftQuestion{
-		{
-			text: "O que é o Node.js?",
-			options: []string{
+		nq(
+			"No material, o que é o Node.js?",
+			[]string{
 				"Um framework de front-end para desenhar telas no navegador",
-				"Um ambiente que executa JavaScript fora do navegador",
-				"Um banco de dados relacional instalado na sua máquina",
-				"Um editor de código que substitui o VS Code",
+				"O ambiente que executa JavaScript fora do navegador, no computador ou em um servidor",
+				"O banco PostgreSQL instalado na sua máquina",
+				"O editor que substitui o VS Code",
 			},
-			correctIndex: 1,
-		},
-		{
-			text: "O que é o Supabase, do jeito que usamos nesta aula?",
-			options: []string{
-				"Um backend na nuvem construído sobre o PostgreSQL",
-				"Uma biblioteca que roda o banco dentro do seu computador",
+			1,
+		),
+		nq(
+			"Para que serve o npm, que vem com o Node.js?",
+			[]string{
+				"Baixar e organizar bibliotecas: npm install nome-da-biblioteca",
+				"Criar a tabela alunos no painel do Supabase",
+				"Ligar o Row Level Security da tabela",
+				"Gerar a senha do banco na hora de criar o projeto",
+			},
+			0,
+		),
+		nqCode(
+			"Depois de instalar o Node no Windows, o que estes comandos confirmam?",
+			"node -v\nnpm -v",
+			"shell",
+			[]string{
+				"Que a anon key foi copiada para o .env",
+				"Que a tabela alunos já existe no Supabase",
+				"Que o Node e o npm estão no PATH; se o comando não existir, falta reinstalar com Add to PATH e reabrir o terminal",
+				"Que o servidor Express já está escutando na porta 3000",
+			},
+			2,
+		),
+		nq(
+			"O que é o Supabase, do jeito que a aula usa?",
+			[]string{
+				"Um backend na nuvem sobre PostgreSQL; o foco da aula é banco de dados + cliente JavaScript",
+				"Um banco que roda só dentro do seu computador",
 				"Um substituto do npm para instalar pacotes",
-				"Um servidor HTTP que dispensa o Express",
+				"O servidor HTTP que dispensa o Express",
 			},
-			correctIndex: 0,
-		},
-		{
-			text: "O que cada pacote instalado abaixo faz no projeto?",
-			code: `npm init -y
-npm install @supabase/supabase-js dotenv express`,
-			codeLanguage: "shell",
-			options: []string{
-				"supabase-js cria o servidor, dotenv instala o Node e express lê o .env",
-				"Os três são opcionais: o Node já vem com tudo isso pronto",
-				"supabase-js conversa com o Supabase, dotenv lê o .env e express cria a API HTTP",
-				"supabase-js instala o PostgreSQL na sua máquina e os outros dois são atalhos",
+			0,
+		),
+		nq(
+			"No CRUD do material, a letra U corresponde a qual comando SQL?",
+			[]string{
+				"INSERT — cadastrar um registro novo",
+				"SELECT — consultar registros",
+				"UPDATE — alterar um registro existente",
+				"DELETE — apagar um registro",
 			},
-			correctIndex: 2,
-		},
-		{
-			text: "No script da tabela, o que a linha do RA garante?",
-			code: `create table if not exists alunos (
-  id bigint generated always as identity primary key,
-  nome text not null,
-  ra text not null unique,
-  curso text,
-  criado_em timestamptz default now()
-);`,
-			codeLanguage: "sql",
-			options: []string{
+			2,
+		),
+		nq(
+			"Na arquitetura do exercício, por onde o dado passa até a tabela alunos?",
+			[]string{
+				"O PostgreSQL roda na sua máquina e o Node só abre o arquivo .sql",
+				"Node.js (index.js ou server.js) → @supabase/supabase-js → HTTPS → Supabase Cloud",
+				"O navegador grava direto no Table Editor, sem biblioteca",
+				"O Express substitui o Supabase e guarda os alunos na memória",
+			},
+			1,
+		),
+		nq(
+			"Ao criar o projeto no Supabase, por que a aula pede a região mais próxima?",
+			[]string{
+				"Porque só South America aceita a chave anon",
+				"Porque a região escolhe o nome das colunas da tabela",
+				"Porque a senha do banco só vale nessa região",
+				"Porque uma região mais próxima reduz a latência",
+			},
+			3,
+		),
+		nq(
+			"O que o material diz sobre a chave service_role?",
+			[]string{
+				"É chave de admin e nunca deve ir para o front-end",
+				"É a chave que colocamos em SUPABASE_ANON_KEY",
+				"É a senha do Database Password, anotada no .env",
+				"É o papel anon dentro do Postgres",
+			},
+			0,
+		),
+		nq(
+			"A anon key pode aparecer no código e ser vista no navegador. O que realmente decide o que ela pode fazer?",
+			[]string{
+				"O sigilo da chave, que funciona como senha",
+				"O arquivo .env, que criptografa o banco",
+				"As policies de RLS: a chave é o crachá de visitante; as regras da portaria é que abrem a porta",
+				"O HTTPS, que impede qualquer leitura da tabela",
+			},
+			2,
+		),
+		nq(
+			"A palavra anon aparece em dois lugares. Qual leitura o material faz?",
+			[]string{
+				"São a mesma coisa: a chave do .env já é a policy",
+				"A chave no .env identifica o visitante; o Postgres executa a query como o papel (role) anon, e a policy to anon decide o que libera",
+				"anon no .env é o service_role; anon na policy é o usuário logado",
+				"O papel anon só existe depois que alguém faz login",
+			},
+			1,
+		),
+		nqCode(
+			"No script da tabela, o que a linha do RA garante?",
+			`ra text not null unique`,
+			"sql",
+			[]string{
 				"Que o RA é preenchido automaticamente pelo banco",
-				"Que o RA é obrigatório e não pode se repetir na tabela",
+				"Que o RA é obrigatório e não pode se repetir",
 				"Que o RA pode ficar em branco, desde que não se repita",
 				"Que o RA passa a ser a chave primária no lugar do id",
 			},
-			correctIndex: 1,
-		},
-		{
-			text: "O que essa policy libera na tabela alunos?",
-			code: `alter table alunos enable row level security;
-
-create policy "alunos_select_anon" on alunos
-  for select to anon
-  using (true);`,
-			codeLanguage: "sql",
-			options: []string{
-				"Leitura de qualquer linha para quem usa a chave anon",
-				"Todas as operações do CRUD para qualquer usuário",
-				"Apenas a inserção de novas linhas pelo painel do Supabase",
-				"Nada: policies só valem para usuários que fizeram login",
+			1,
+		),
+		nqCode(
+			"O que generated always as identity faz na coluna id?",
+			`id bigint generated always as identity primary key`,
+			"sql",
+			[]string{
+				"Obriga o cliente a enviar o id em todo INSERT",
+				"Impede que a tabela tenha chave primária",
+				"O próprio banco gera 1, 2, 3… (o equivalente ao AUTO_INCREMENT)",
+				"Preenche a data e a hora do cadastro",
 			},
-			correctIndex: 0,
-		},
-		{
-			text: "A anon key aparece no código e pode ser vista no navegador. O que realmente protege os dados?",
-			options: []string{
-				"O sigilo da chave, que funciona como uma senha",
-				"O HTTPS, que impede qualquer leitura indevida da tabela",
-				"O arquivo .env, que criptografa o banco de dados",
-				"As policies de RLS, que decidem o que o papel anon pode fazer",
+			2,
+		),
+		nq(
+			"Com o RLS ligado e nenhuma policy criada, o que o papel anon consegue fazer?",
+			[]string{
+				"SELECT, INSERT, UPDATE e DELETE, porque a chave do .env está correta",
+				"Só SELECT; gravar continua bloqueado",
+				"Só o que o Table Editor permitir, ignorando o Node",
+				"Nada: não lê, não grava, não altera e não apaga",
 			},
-			correctIndex: 3,
-		},
-		{
-			text:         "Para que serve a palavra await na linha abaixo?",
-			code:         `const { data, error } = await supabase.from('alunos').select('*');`,
-			codeLanguage: "javascript",
-			options: []string{
-				"Espera a resposta do banco chegar antes de seguir para a próxima linha",
-				"Faz a consulta rodar mais rápido dentro do Supabase",
-				"Converte o resultado da consulta em texto",
-				"Cancela a consulta se ela demorar demais",
+			3,
+		),
+		nqCode(
+			"Nesta policy de INSERT, qual cláusula o material usa, e o que ela olha?",
+			`create policy "alunos_insert_anon" on alunos
+  for insert to anon
+  with check (true);`,
+			"sql",
+			[]string{
+				"WITH CHECK: olha o dado novo que está entrando",
+				"USING: olha as linhas que já estão gravadas",
+				"USING e WITH CHECK juntos, como no UPDATE",
+				"Nenhuma: INSERT não precisa de condição",
 			},
-			correctIndex: 0,
-		},
-		{
-			text: "Para que serve o .single() no final da consulta?",
-			code: `async function inserirAluno(nome, ra, curso) {
-  const { data, error } = await supabase
-    .from('alunos')
-    .insert([{ nome, ra, curso }])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+			0,
+		),
+		nq(
+			"No policies.sql da aula, por que o UPDATE usa USING e WITH CHECK?",
+			[]string{
+				"USING escolhe a tabela; WITH CHECK escolhe o papel anon",
+				"USING pergunta se posso alterar esta linha; WITH CHECK pergunta se o valor final é permitido",
+				"Os dois são sinônimos; o script repete por segurança",
+				"USING vale para INSERT; WITH CHECK vale só para DELETE",
+			},
+			1,
+		),
+		nq(
+			"Qual é a ordem correta que o checklist do material pede?",
+			[]string{
+				"npm start, depois policies.sql, depois tabela_alunos.sql",
+				"policies.sql primeiro, porque o RLS cria a tabela",
+				"tabela_alunos.sql, depois policies.sql, e só então npm run demo ou npm start",
+				"Só o Table Editor; os arquivos .sql são opcionais",
+			},
+			2,
+		),
+		nq(
+			"O que o material avisa sobre using (true) e with check (true)?",
+			[]string{
+				"É o modo certo para um app real com dados sensíveis",
+				"Bloqueia a anon key, então ninguém de fora lê a tabela",
+				"Só libera SELECT; INSERT continua negado",
+				"Qualquer pessoa com a chave anon pode ler e apagar todos os alunos; serve para estudar, não para produção",
+			},
+			3,
+		),
+		nq(
+			"O Node responde violates row-level security policy. O que a aula manda fazer?",
+			[]string{
+				"Rodar de novo o policies.sql: a policy falta ou o RLS está sem regra",
+				"Trocar a anon key pela service_role no front-end",
+				"Apagar a tabela e criar outra com outro nome",
+				"Tirar o await da função, porque a Promise ainda está pendente",
+			},
+			0,
+		),
+		nqCode(
+			"O que cada pacote instalado abaixo faz no projeto?",
+			`npm install @supabase/supabase-js dotenv express`,
+			"shell",
+			[]string{
+				"supabase-js cria o servidor, dotenv instala o Node e express lê o .env",
+				"Os três são opcionais: o Node já vem com tudo isso pronto",
+				"supabase-js conversa com o Supabase, dotenv lê o .env e express cria a API HTTP",
+				"supabase-js instala o PostgreSQL na máquina e os outros dois são atalhos",
+			},
+			2,
+		),
+		nq(
+			"O que require('dotenv').config() faz, e o que não pode ir para o GitHub?",
+			[]string{
+				"Sobe o Express na porta 3000; o package.json é que não pode ser commitado",
+				"Lê o .env e coloca cada linha em process.env; o .env entra no .gitignore e não vai para o GitHub",
+				"Cria as policies de RLS a partir do .env",
+				"Rotaciona a anon key automaticamente a cada npm start",
+			},
+			1,
+		),
+		nqCode(
+			"O que este código imprime, e por quê?",
+			`function buscar() {
+  const resultado = supabase.from('alunos').select('*');
+  console.log(resultado);
 }`,
-			codeLanguage: "javascript",
-			options: []string{
-				"Faz o retorno vir como um único objeto, em vez de um array",
-				"Garante que apenas uma linha seja inserida por vez",
-				"Ignora o erro caso o RA já exista na tabela",
-				"Ordena o resultado pelo id antes de devolver",
+			"javascript",
+			[]string{
+				"Uma Promise pendente: faltou await, então o código não esperou os dados",
+				"O array de alunos, porque select('*') já é síncrono",
+				"null, porque a função não é async",
+				"O erro violates row-level security, sempre",
 			},
-			correctIndex: 0,
-		},
-		{
-			text: "Qual método do supabase-js faz o mesmo papel que o SELECT do SQL?",
-			options: []string{
-				".insert([{ nome, ra }])",
-				".update({ curso })",
-				".select('*')",
-				".delete()",
+			0,
+		),
+		nqCode(
+			"Para que serve o .single() no final do insert?",
+			`const { data, error } = await supabase
+  .from('alunos')
+  .insert([{ nome, ra, curso }])
+  .select()
+  .single();`,
+			"javascript",
+			[]string{
+				"Garante que só uma linha seja inserida por vez",
+				"Devolve um único objeto, em vez de um array",
+				"Ignora o erro se o RA já existir",
+				"Ordena o resultado pelo id",
 			},
-			correctIndex: 2,
-		},
-		{
-			text: "O que o filtro abaixo procura no banco?",
-			code: `async function buscarPorNome(parteNome) {
-  const { data, error } = await supabase
-    .from('alunos')
-    .select('*')
-    .ilike('nome', '%' + parteNome + '%')
-    .order('nome', { ascending: true });
-
-  if (error) throw error;
-  return data;
-}`,
-			codeLanguage: "javascript",
-			options: []string{
-				"Nomes que contenham o texto em qualquer posição, sem diferenciar maiúsculas",
-				"Somente nomes que comecem exatamente com o texto informado",
-				"Somente nomes idênticos ao texto, respeitando maiúsculas e minúsculas",
-				"Nomes que terminem com o texto, ignorando acentos",
+			1,
+		),
+		nqCode(
+			"Na busca por RA, por que a aula usa maybeSingle() e não single()?",
+			`.eq('ra', ra)
+.maybeSingle();`,
+			"javascript",
+			[]string{
+				"maybeSingle ordena pelo nome; single não ordena",
+				"maybeSingle ignora o RLS; single exige policy",
+				"Os dois lançam erro quando o RA não existe",
+				"maybeSingle aceita 0 ou 1 linha e devolve null se não achar; single lançaria erro se não houvesse linha",
 			},
-			correctIndex: 0,
-		},
-		{
-			text: "O que aconteceria se o .eq('ra', ra) fosse esquecido nesse update?",
-			code: `async function atualizarCurso(ra, curso) {
-  const { data, error } = await supabase
-    .from('alunos')
-    .update({ curso })
-    .eq('ra', ra)
-    .select();
-
-  if (error) throw error;
-  return data;
-}`,
-			codeLanguage: "javascript",
-			options: []string{
+			3,
+		),
+		nqCode(
+			"O que aconteceria se o .eq('ra', ra) fosse esquecido nesse update?",
+			`const { data, error } = await supabase
+  .from('alunos')
+  .update(campos)
+  .eq('ra', ra)
+  .select();`,
+			"javascript",
+			[]string{
 				"O Supabase recusaria a operação automaticamente",
 				"Apenas a primeira linha da tabela seria alterada",
-				"Nada mudaria: o .eq() serve só para documentar a intenção",
-				"O update alteraria o curso de todas as linhas da tabela",
+				"O update alteraria todas as linhas da tabela",
+				"Nada mudaria: o .eq() só documenta a intenção",
 			},
-			correctIndex: 3,
-		},
-		{
-			text: "Entre as rotas da API, qual delas cadastra um aluno novo?",
-			code: `app.get('/alunos', listar);
-app.post('/alunos', criar);
-app.put('/alunos/:ra', alterar);
-app.delete('/alunos/:ra', apagar);`,
-			codeLanguage: "javascript",
-			options: []string{
-				"GET /alunos",
-				"POST /alunos",
-				"PUT /alunos/:ra",
-				"DELETE /alunos/:ra",
+			2,
+		),
+		nqCode(
+			"O que o filtro abaixo procura?",
+			`.ilike('nome', '%' + parteNome + '%')`,
+			"javascript",
+			[]string{
+				"Nomes que contenham o texto em qualquer posição, sem diferenciar maiúsculas",
+				"Somente nomes que comecem exatamente com o texto",
+				"Somente nomes idênticos, respeitando maiúsculas",
+				"Nomes que terminem com o texto, e só se tiverem acento",
 			},
-			correctIndex: 1,
-		},
-		{
-			text: "Na rota abaixo, o que é o :ra e de onde vem o 404?",
-			code: `app.get('/alunos/:ra', async (req, res) => {
-  try {
-    const aluno = await buscarPorRa(req.params.ra);
-    if (!aluno) return res.status(404).json({ erro: 'Aluno não encontrado' });
-    res.json(aluno);
-  } catch (e) {
-    res.status(500).json({ erro: e.message });
-  }
+			0,
+		),
+		nqCode(
+			"Sem a linha app.use(express.json()), o que chega em req.body no POST?",
+			`app.use(express.json());
+
+app.post('/alunos', async (req, res) => {
+  const { nome, ra, curso } = req.body;
 });`,
-			codeLanguage: "javascript",
-			options: []string{
-				"É um comentário do Express; o 404 vem direto do Supabase",
-				"É um parâmetro de rota lido em req.params.ra, e o 404 sai quando o RA não existe",
-				"É o corpo enviado pelo cliente, e o 404 aparece quando o body está vazio",
-				"É um caminho literal: só a URL /alunos/:ra funciona nessa rota",
+			"javascript",
+			[]string{
+				"O JSON já convertido, porque o Express lê o body sozinho",
+				"Uma string com o texto cru do PowerShell",
+				"O parâmetro :ra da URL",
+				"undefined: o middleware é quem transforma o JSON em objeto",
 			},
-			correctIndex: 1,
-		},
-		{
-			text:         "Depois de um POST, a API respondeu com o código 201. O que isso quer dizer?",
-			code:         `res.status(201).json(aluno);`,
-			codeLanguage: "javascript",
-			options: []string{
-				"Que o aluno foi criado com sucesso",
-				"Que faltou preencher um campo obrigatório",
-				"Que o RA informado não foi encontrado",
-				"Que algo quebrou dentro do servidor",
+			3,
+		),
+		nqCode(
+			"Depois de um POST bem-sucedido, a API responde assim. O que o 201 significa no material?",
+			`res.status(201).json(aluno);`,
+			"javascript",
+			[]string{
+				"Bad Request: faltou nome ou ra",
+				"Created: o aluno foi criado",
+				"Not Found: o RA não existe",
+				"Internal Server Error: o banco quebrou",
 			},
-			correctIndex: 0,
-		},
-		{
-			text:         "Para que serve o -ContentType 'application/json' neste teste?",
-			code:         `Invoke-RestMethod -Method Post -Uri http://localhost:3000/alunos -ContentType 'application/json' -Body '{"nome":"João Souza","ra":"2026002","curso":"ADS"}'`,
-			codeLanguage: "shell",
-			options: []string{
-				"Avisa o servidor que o corpo é JSON, para o express.json() conseguir interpretá-lo",
-				"Define a porta em que o servidor Express vai escutar",
-				"Converte a resposta recebida em uma tabela do PowerShell",
-				"Autentica a requisição usando a anon key do Supabase",
+			1,
+		),
+		nq(
+			"No navegador, http://localhost:3000/alunos mostra []. O que a aula diz?",
+			[]string{
+				"Não é erro: a tabela está vazia (não rodou npm run demo, ou os dados foram apagados)",
+				"A porta 3000 está ocupada (EADDRINUSE)",
+				"Falta o Content-Type, então o Express não montou o array",
+				"O service_role foi parar no front-end",
 			},
-			correctIndex: 0,
-		},
+			0,
+		),
+		nq(
+			"No frontend da aula, o que é o DOM?",
+			[]string{
+				"O banco PostgreSQL visto pelo Table Editor",
+				"A árvore de elementos da página que o JavaScript lê e muda, por exemplo com getElementById",
+				"O arquivo .env com a URL e a anon key",
+				"O middleware que lê o JSON do POST",
+			},
+			1,
+		),
+		nqCode(
+			"Para que serve evento.preventDefault() ao salvar o aluno?",
+			`async function salvarAluno(evento) {
+  evento.preventDefault();
+}`,
+			"javascript",
+			[]string{
+				"Impede o RLS de bloquear o INSERT",
+				"Converte o formulário em JSON antes do fetch",
+				"Cancela o recarregar da página, que é o comportamento padrão do formulário",
+				"Fecha o modal e chama listarAlunos",
+			},
+			2,
+		),
 	}
 }

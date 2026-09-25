@@ -8,8 +8,8 @@ import (
 
 func TestNodeSupabaseQuestions(t *testing.T) {
 	qs := nodeSupabaseQuestions()
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 30 {
+		t.Fatalf("want 30 questions, got %d", len(qs))
 	}
 	withCode := 0
 	for i, q := range qs {
@@ -21,6 +21,9 @@ func TestNodeSupabaseQuestions(t *testing.T) {
 		}
 		if q.correctIndex < 0 || q.correctIndex >= len(q.options) {
 			t.Errorf("q%d: correctIndex %d out of range", i+1, q.correctIndex)
+		}
+		if q.timeLimitSec != timeLimitNodeSupabase {
+			t.Errorf("q%d: want %ds, got %ds", i+1, timeLimitNodeSupabase, q.timeLimitSec)
 		}
 		for j, opt := range q.options {
 			if opt == "" {

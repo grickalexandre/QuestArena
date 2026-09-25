@@ -33,15 +33,15 @@ func TestEnsureNodeSupabaseQuizIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list questions: %v", err)
 	}
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 30 {
+		t.Fatalf("want 30 questions, got %d", len(qs))
 	}
 	for _, q := range qs {
 		if q.CodeSnippet != "" && q.CodeLanguage == "" {
 			t.Errorf("question %q has code without language", q.Text)
 		}
-		if q.TimeLimitSec != timeLimitOneMin {
-			t.Errorf("question %q: want %ds, got %ds", q.Text, timeLimitOneMin, q.TimeLimitSec)
+		if q.TimeLimitSec != timeLimitNodeSupabase {
+			t.Errorf("question %q: want %ds, got %ds", q.Text, timeLimitNodeSupabase, q.TimeLimitSec)
 		}
 	}
 }
@@ -75,8 +75,8 @@ func TestEnsureRewritesOutdatedQuestions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list questions after ensure: %v", err)
 	}
-	if len(qs) != 15 {
-		t.Fatalf("want 15 questions, got %d", len(qs))
+	if len(qs) != 30 {
+		t.Fatalf("want 30 questions, got %d", len(qs))
 	}
 	want := nodeSupabaseQuestions()[6]
 	for _, q := range qs {
