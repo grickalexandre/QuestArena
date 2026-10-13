@@ -42,6 +42,9 @@ type ResultEntry = {
   similarity?: number
   text?: string
   choice?: number
+  method?: string
+  feedback?: string
+  pending?: boolean
 }
 
 type QuestionResult = {
@@ -52,6 +55,7 @@ type QuestionResult = {
   leaderboard: BoardEntry[]
   results: ResultEntry[]
   autoNextInSec?: number
+  aiGrading?: boolean
 }
 
 type JoinedPayload = {
@@ -124,6 +128,9 @@ export default function PlayPage() {
   const [lastPoints, setLastPoints] = useState<number | null>(null)
   const [lastSimilarity, setLastSimilarity] = useState<number | null>(null)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
+  const [lastMethod, setLastMethod] = useState('')
+  const [lastFeedback, setLastFeedback] = useState('')
+  const [lastPending, setLastPending] = useState(false)
   const [board, setBoard] = useState<BoardEntry[]>([])
   const [error, setError] = useState('')
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
@@ -172,6 +179,9 @@ export default function PlayPage() {
     setLastPoints(null)
     setLastSimilarity(null)
     setLastCorrect(null)
+    setLastMethod('')
+    setLastFeedback('')
+    setLastPending(false)
     setAutoNextIn(null)
     setLeftThisQuestion(!!forfeited)
     setForfeitMessage(forfeited ? 'Você saiu da tela e perdeu esta questão.' : '')
@@ -190,6 +200,9 @@ export default function PlayPage() {
       setLastPoints(mine.points)
       setLastCorrect(mine.correct)
       if (typeof mine.similarity === 'number') setLastSimilarity(mine.similarity)
+      setLastMethod(mine.method || '')
+      setLastFeedback(mine.feedback || '')
+      setLastPending(Boolean(mine.pending))
       if (mine.text) setSubmittedText(mine.text)
       if (typeof mine.choice === 'number' && mine.choice >= 0) setSelected(mine.choice)
     }
@@ -257,6 +270,10 @@ export default function PlayPage() {
       }),
       on('question_result', (data) => {
         applyResult(data as QuestionResult, credsRef.current.playerId)
+      }),
+      on('scores_updated', (data) => {
+        const d = data as { leaderboard?: BoardEntry[] }
+        if (d.leaderboard) setBoard(d.leaderboard)
       }),
       on('finished', (data) => {
         setPhase('finished')
@@ -534,19 +551,31 @@ export default function PlayPage() {
             <div className="reveal-card">
               {isEssay ? (
                 <>
-                  <div className="sim-meter">
-                    <div className="sim-bar">
-                      <div
-                        className="sim-fill"
-                        style={{ width: `${Math.round((lastSimilarity || 0) * 100)}%` }}
-                      />
-                    </div>
-                    <strong>{Math.round((lastSimilarity || 0) * 100)}% similar</strong>
-                  </div>
-                  <p className={`result-banner ${lastCorrect ? 'ok' : 'ko'}`}>
-                    {lastCorrect ? 'Resposta aceita' : 'Não atingiu o mínimo'}
-                    {lastPoints != null ? ` · +${lastPoints} XP` : ''}
-                  </p>
+                  {lastPending ? (
+                    <p className="result-banner">A IA está corrigindo sua resposta pelo contexto...</p>
+                  ) : (
+                    <>
+                      <div className="sim-meter">
+                        <div className="sim-bar">
+                          <div
+                            className="sim-fill"
+                            style={{ width: `${Math.round((lastSimilarity || 0) * 100)}%` }}
+                          />
+                        </div>
+                        <strong>
+                          {lastMethod === 'ia' || lastMethod === 'professor'
+                            ? `Nota ${Math.round((lastSimilarity || 0) * 100)}/100`
+                            : `${Math.round((lastSimilarity || 0) * 100)}% similar`}
+                        </strong>
+                      </div>
+                      <p className={`result-banner ${lastCorrect ? 'ok' : 'ko'}`}>
+                        {lastCorrect ? 'Resposta aceita' : 'Não atingiu o mínimo'}
+                        {lastPoints != null ? ` · +${lastPoints} XP` : ''}
+                        {lastMethod === 'professor' ? ' · nota revisada pelo professor' : ''}
+                      </p>
+                      {lastFeedback && <p className="ai-feedback">{lastFeedback}</p>}
+                    </>
+                  )}
                   <div className="answer-compare">
                     <div>
                       <span className="label">Sua resposta</span>

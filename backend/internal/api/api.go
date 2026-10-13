@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/questarena/questarena/internal/auth"
 	"github.com/questarena/questarena/internal/game"
+	"github.com/questarena/questarena/internal/grader"
 	"github.com/questarena/questarena/internal/models"
 	"github.com/questarena/questarena/internal/seed"
 	"github.com/questarena/questarena/internal/store"
@@ -22,6 +23,7 @@ type Server struct {
 	Hub       *game.Hub
 	AuthMode  string
 	StaticDir string
+	Grader    game.EssayGrader
 }
 
 func NewServer(s store.Store, v auth.Verifier, hub *game.Hub) *Server {
@@ -55,6 +57,7 @@ func (s *Server) Routes() http.Handler {
 	api.HandleFunc("/sessions", s.handleListSessions).Methods("GET", "OPTIONS")
 	api.HandleFunc("/sessions/{id}", s.handleGetSession).Methods("GET", "OPTIONS")
 	api.HandleFunc("/similarity", s.handleSimilarity).Methods("POST", "OPTIONS")
+	api.HandleFunc("/grade-preview", s.handleGradePreview).Methods("POST", "OPTIONS")
 
 	r.HandleFunc("/ws", s.Hub.ServeWS)
 
@@ -108,10 +111,11 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status":   "ok",
-		"authMode": s.AuthMode,
-		"lanIP":    lanIPv4(),
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"authMode":  s.AuthMode,
+		"lanIP":     lanIPv4(),
+		"aiGrading": s.Grader != nil,
 	})
 }
 
@@ -488,6 +492,62 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleGradePreview(w http.ResponseWriter, r *http.Request) {
+	if s.Grader == nil {
+		writeErr(w, http.StatusServiceUnavailable, "correção por contexto desativada (GEMINI_API_KEY não configurada)")
+		return
+	}
+	var req struct {
+		Question        string   `json:"question"`
+		Text            string   `json:"text"`
+		ExpectedAnswer  string   `json:"expectedAnswer"`
+		ExpectedAnswers []string `json:"expectedAnswers"`
+		KeyTerms        []string `json:"keyTerms"`
+		Criteria        string   `json:"gradingCriteria"`
+		Threshold       float64  `json:"threshold"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	q := models.Question{
+		ExpectedAnswer:  req.ExpectedAnswer,
+		ExpectedAnswers: req.ExpectedAnswers,
+		KeyTerms:        req.KeyTerms,
+	}
+	q.NormalizeEssayRefs()
+	q.NormalizeKeyTerms()
+	text := strings.TrimSpace(req.Text)
+	if q.ExpectedAnswer == "" || text == "" {
+		writeErr(w, http.StatusBadRequest, "informe a resposta esperada e a resposta de teste")
+		return
+	}
+	if len([]rune(text)) > 2000 || len([]rune(req.Criteria)) > 2000 {
+		writeErr(w, http.StatusBadRequest, "texto muito longo")
+		return
+	}
+	verdicts, err := s.Grader.Grade(r.Context(), grader.Batch{
+		Question: req.Question,
+		Expected: q.EssayReferences(),
+		Criteria: req.Criteria,
+		KeyTerms: q.KeyTerms,
+		Answers:  []grader.Answer{{ID: "r1", Text: text}},
+	})
+	if err != nil || len(verdicts) == 0 {
+		writeErr(w, http.StatusBadGateway, "a IA não respondeu; tente de novo em alguns segundos")
+		return
+	}
+	th := req.Threshold
+	if th <= 0 {
+		th = 0.55
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"score":    verdicts[0].Score,
+		"feedback": verdicts[0].Feedback,
+		"passed":   verdicts[0].Score >= th,
+	})
+}
+
 func (s *Server) ensureQuizOwner(r *http.Request, teacherID, quizID string) error {
 	q, err := s.Store.GetQuiz(r.Context(), quizID)
 	if err != nil {
@@ -537,6 +597,10 @@ func validateQuestion(q *models.Question) error {
 		if len(q.EssayReferences()) > 8 {
 			return &simpleError{"no máximo 8 respostas aceitas"}
 		}
+		q.GradingCriteria = strings.TrimSpace(q.GradingCriteria)
+		if len([]rune(q.GradingCriteria)) > 2000 {
+			return &simpleError{"critérios de correção muito longos (máximo 2000 caracteres)"}
+		}
 		q.Options = nil
 		q.CorrectIndex = -1
 		if q.SimilarityThreshold <= 0 {
@@ -564,6 +628,7 @@ func validateQuestion(q *models.Question) error {
 		q.ExpectedAnswer = ""
 		q.ExpectedAnswers = nil
 		q.KeyTerms = nil
+		q.GradingCriteria = ""
 		if q.TimeLimitSec <= 0 {
 			q.TimeLimitSec = 60
 		}

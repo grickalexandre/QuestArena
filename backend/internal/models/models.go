@@ -38,6 +38,7 @@ type Question struct {
 	ExpectedAnswer      string       `json:"expectedAnswer" firestore:"expectedAnswer"`
 	ExpectedAnswers     []string     `json:"expectedAnswers,omitempty" firestore:"expectedAnswers,omitempty"`
 	KeyTerms            []string     `json:"keyTerms,omitempty" firestore:"keyTerms,omitempty"`
+	GradingCriteria     string       `json:"gradingCriteria,omitempty" firestore:"gradingCriteria,omitempty"`
 	SimilarityThreshold float64      `json:"similarityThreshold" firestore:"similarityThreshold"`
 	CodeSnippet         string       `json:"codeSnippet" firestore:"codeSnippet"`
 	CodeLanguage        string       `json:"codeLanguage" firestore:"codeLanguage"`

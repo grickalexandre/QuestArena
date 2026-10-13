@@ -607,6 +607,33 @@ label {
   line-height: 1.45;
 }
 
+.essay-results li > .btn {
+  margin-top: 0.55rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.grade-override {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+.grade-override input {
+  width: 5rem;
+}
+
+.grade-override .btn {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.ai-feedback {
+  margin: 0.6rem 0 0;
+  line-height: 1.45;
+}
+
 @media (max-width: 860px) {
   .answer-compare {
     grid-template-columns: 1fr;

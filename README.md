@@ -117,6 +117,16 @@ VITE_FIREBASE_APP_ID=...
 
 O frontend usa o ID token do Firebase; o Go valida o token e persiste quizzes no Firestore.
 
+## Correção das dissertativas por contexto (Gemini)
+
+Com `GEMINI_API_KEY` definida no backend (no Railway: aba **Variables**), as dissertativas são corrigidas pelo sentido da resposta, não pela semelhança de palavras. Quando o tempo da questão acaba, o servidor manda **uma única chamada** ao Gemini com o enunciado, a resposta de referência, os critérios de correção e as respostas da turma (sem nomes nem RA). A IA devolve nota de 0 a 100 e um comentário curto para cada aluno.
+
+- Gere a chave em [Google AI Studio](https://aistudio.google.com/apikey).
+- `GEMINI_MODEL` é opcional (padrão `gemini-3.5-flash-lite`). Se ele estiver sobrecarregado, o servidor tenta `GEMINI_FALLBACK_MODEL` (padrão `gemini-3.8-flash`; use `none` para desligar). O `gemini-2.5-flash` não está mais disponível para contas novas.
+- No plano gratuito a correção de uma questão leva cerca de 25 s; o resultado aparece como "corrigindo..." até lá.
+- No resultado da questão, o professor pode clicar em **Ajustar nota**; isso pausa o avanço automático.
+- Se a IA falhar ou demorar mais de 90 s, vale a nota por semelhança de palavras.
+
 ## API principal
 
 | Método | Rota | Descrição |

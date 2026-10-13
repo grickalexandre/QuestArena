@@ -23,6 +23,7 @@ export type Question = {
   expectedAnswer?: string
   expectedAnswers?: string[]
   keyTerms?: string[]
+  gradingCriteria?: string
   similarityThreshold?: number
   codeSnippet?: string
   codeLanguage?: string
@@ -69,7 +70,8 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ status: string; authMode: string; lanIP?: string }>('/api/health'),
+  health: () =>
+    request<{ status: string; authMode: string; lanIP?: string; aiGrading?: boolean }>('/api/health'),
   authMode: () => request<{ mode: string }>('/api/auth/mode'),
   devLogin: (email: string, password: string, name?: string) =>
     request<{ token: string; teacher: Teacher }>('/api/auth/dev-login', {
@@ -139,6 +141,23 @@ export const api = {
       threshold: number
       matches: { answer: string; similarity: number }[]
     }>('/api/similarity', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(body),
+    }),
+  previewGrade: (
+    token: string,
+    body: {
+      question: string
+      text: string
+      expectedAnswer: string
+      expectedAnswers?: string[]
+      keyTerms?: string[]
+      gradingCriteria?: string
+      threshold?: number
+    },
+  ) =>
+    request<{ score: number; feedback: string; passed: boolean }>('/api/grade-preview', {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify(body),

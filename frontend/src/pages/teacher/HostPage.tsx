@@ -64,6 +64,20 @@ type ResultEntry = {
   similarity?: number
   points: number
   correct: boolean
+  method?: string
+  feedback?: string
+  pending?: boolean
+}
+type QuestionResultPayload = {
+  questionIndex?: number
+  correctIndex: number
+  expectedAnswer?: string
+  expectedAnswers?: string[]
+  leaderboard: BoardEntry[]
+  results: ResultEntry[]
+  autoNextInSec?: number
+  aiGrading?: boolean
+  paused?: boolean
 }
 
 const COLORS = ['#e21b3c', '#1368ce', '#d89e00', '#26890c']
@@ -80,6 +94,9 @@ export default function HostPage() {
   const [expectedAnswer, setExpectedAnswer] = useState('')
   const [expectedAnswers, setExpectedAnswers] = useState<string[]>([])
   const [results, setResults] = useState<ResultEntry[]>([])
+  const [resultIndex, setResultIndex] = useState(0)
+  const [aiGrading, setAiGrading] = useState(false)
+  const [paused, setPaused] = useState(false)
   const [board, setBoard] = useState<BoardEntry[]>([])
   const [answered, setAnswered] = useState(0)
   const [error, setError] = useState('')
@@ -113,6 +130,19 @@ export default function HostPage() {
 
     connect()
 
+    function applyResult(d: QuestionResultPayload) {
+      setCorrectIndex(d.correctIndex)
+      setExpectedAnswer(d.expectedAnswer || '')
+      setExpectedAnswers(d.expectedAnswers || [])
+      setResults(d.results || [])
+      setResultIndex(d.questionIndex ?? 0)
+      setAiGrading(Boolean(d.aiGrading))
+      setPaused(Boolean(d.paused))
+      setBoard(d.leaderboard)
+      setEndsAt(null)
+      setAutoNextIn(d.autoNextInSec ?? 5)
+    }
+
     const offs = [
       on('hosted', (data) => {
         const d = data as {
@@ -121,14 +151,7 @@ export default function HostPage() {
           quizTitle: string
           question?: PublicQuestion
           endsAt?: string
-          questionResult?: {
-            correctIndex: number
-            expectedAnswer?: string
-            expectedAnswers?: string[]
-            leaderboard: BoardEntry[]
-            results: ResultEntry[]
-            autoNextInSec?: number
-          }
+          questionResult?: QuestionResultPayload
           leaderboard?: BoardEntry[]
           grades?: GradeRow[]
         }
@@ -141,15 +164,7 @@ export default function HostPage() {
         setQuizTitle(d.quizTitle)
         if (d.question) setQuestion(d.question)
         if (d.endsAt && d.phase === 'question') setEndsAt(new Date(d.endsAt).getTime())
-        if (d.questionResult) {
-          setCorrectIndex(d.questionResult.correctIndex)
-          setExpectedAnswer(d.questionResult.expectedAnswer || '')
-          setExpectedAnswers(d.questionResult.expectedAnswers || [])
-          setResults(d.questionResult.results || [])
-          setBoard(d.questionResult.leaderboard)
-          setEndsAt(null)
-          setAutoNextIn(d.questionResult.autoNextInSec ?? 5)
-        }
+        if (d.questionResult) applyResult(d.questionResult)
         if (d.leaderboard) setBoard(d.leaderboard)
         if (d.grades) setGrades(d.grades)
         const action = pendingAction.current
@@ -168,6 +183,8 @@ export default function HostPage() {
         setExpectedAnswer('')
         setExpectedAnswers([])
         setResults([])
+        setAiGrading(false)
+        setPaused(false)
         setAnswered(0)
         setAutoNextIn(null)
         setError('')
@@ -176,22 +193,12 @@ export default function HostPage() {
       }),
       on('answer_count', (data) => setAnswered((data as { answered: number }).answered)),
       on('question_result', (data) => {
-        const d = data as {
-          correctIndex: number
-          expectedAnswer?: string
-          expectedAnswers?: string[]
-          leaderboard: BoardEntry[]
-          results: ResultEntry[]
-          autoNextInSec?: number
-        }
         setPhase('reveal')
-        setCorrectIndex(d.correctIndex)
-        setExpectedAnswer(d.expectedAnswer || '')
-        setExpectedAnswers(d.expectedAnswers || [])
-        setResults(d.results || [])
-        setBoard(d.leaderboard)
-        setEndsAt(null)
-        setAutoNextIn(d.autoNextInSec ?? 5)
+        applyResult(data as QuestionResultPayload)
+      }),
+      on('scores_updated', (data) => {
+        const d = data as { leaderboard?: BoardEntry[] }
+        if (d.leaderboard) setBoard(d.leaderboard)
       }),
       on('finished', (data) => {
         const d = data as { leaderboard: BoardEntry[]; grades?: GradeRow[] }
@@ -358,16 +365,19 @@ export default function HostPage() {
                   )}
                 </div>
               )}
+              {phase === 'reveal' && aiGrading && (
+                <p className="muted">A IA está corrigindo as respostas pelo contexto...</p>
+              )}
               {phase === 'reveal' && (
                 <ul className="essay-results">
                   {results.map((r) => (
-                    <li key={r.playerId}>
-                      <strong>{r.nickname}</strong>
-                      <span className={r.correct ? 'ok' : 'ko'}>
-                        {Math.round((r.similarity || 0) * 100)}% · +{r.points} XP
-                      </span>
-                      <p>{r.text || '—'}</p>
-                    </li>
+                    <EssayResultRow
+                      key={`${resultIndex}-${r.playerId}`}
+                      result={r}
+                      onOverride={(score) =>
+                        send('grade_override', { questionIndex: resultIndex, playerId: r.playerId, score })
+                      }
+                    />
                   ))}
                 </ul>
               )}
@@ -411,9 +421,13 @@ export default function HostPage() {
             <>
               <Leaderboard board={board} />
               <p className="muted">
-                {autoNextIn != null && autoNextIn > 0
-                  ? `Próxima questão em ${autoNextIn}s...`
-                  : 'Avançando...'}
+                {aiGrading
+                  ? 'Aguardando a correção da IA para seguir...'
+                  : paused
+                    ? 'Pausado para revisão das notas. Clique em Próxima quando terminar.'
+                    : autoNextIn != null && autoNextIn > 0
+                      ? `Próxima questão em ${autoNextIn}s...`
+                      : 'Avançando...'}
               </p>
               <button className="btn btn-primary btn-xl" onClick={() => runHostAction('next')}>
                 {question.index + 1 >= question.total ? 'Ver pódio agora' : 'Próxima agora'}
@@ -490,6 +504,78 @@ export default function HostPage() {
       )}
       <Credits compact />
     </div>
+  )
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  ia: 'IA',
+  professor: 'professor',
+  texto: 'palavras',
+}
+
+function EssayResultRow({ result: r, onOverride }: { result: ResultEntry; onOverride: (score: number) => void }) {
+  const current = Math.round((r.similarity || 0) * 100)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(current))
+
+  function save() {
+    const n = Math.round(Number(value))
+    if (!Number.isFinite(n) || n < 0 || n > 100) return
+    onOverride(n)
+    setEditing(false)
+  }
+
+  if (!r.text) {
+    return (
+      <li>
+        <strong>{r.nickname}</strong>
+        <span className="ko">sem resposta</span>
+      </li>
+    )
+  }
+  return (
+    <li>
+      <strong>{r.nickname}</strong>
+      <span className={r.pending ? 'muted' : r.correct ? 'ok' : 'ko'}>
+        {r.pending ? 'corrigindo...' : `nota ${current}/100 · +${r.points} XP`}
+        {!r.pending && r.method ? ` · ${METHOD_LABEL[r.method] || r.method}` : ''}
+      </span>
+      <p>{r.text}</p>
+      {r.feedback && <p className="muted tiny">{r.feedback}</p>}
+      {editing ? (
+        <span className="grade-override">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={value}
+            autoFocus
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+          />
+          <button type="button" className="btn btn-primary" onClick={save}>
+            Salvar
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setEditing(false)}>
+            Cancelar
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            setValue(String(current))
+            setEditing(true)
+          }}
+        >
+          Ajustar nota
+        </button>
+      )}
+    </li>
   )
 }
 

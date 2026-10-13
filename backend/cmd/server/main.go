@@ -13,6 +13,7 @@ import (
 	"github.com/questarena/questarena/internal/api"
 	"github.com/questarena/questarena/internal/auth"
 	"github.com/questarena/questarena/internal/game"
+	"github.com/questarena/questarena/internal/grader"
 	"github.com/questarena/questarena/internal/store"
 	"google.golang.org/api/option"
 )
@@ -61,6 +62,13 @@ func main() {
 
 	hub := game.NewHub(st)
 	srv := api.NewServer(st, v, hub)
+	if g := grader.FromEnv(); g != nil {
+		hub.SetGrader(g)
+		srv.Grader = g
+		log.Printf("essay grading by context enabled (model %s, fallback %q)", g.Model, g.Fallback)
+	} else {
+		log.Println("GEMINI_API_KEY not set: essays graded by text similarity only")
+	}
 
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {

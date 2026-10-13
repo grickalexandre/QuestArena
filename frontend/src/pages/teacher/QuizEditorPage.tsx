@@ -16,6 +16,7 @@ const emptyForm = {
   expectedAnswer: '',
   expectedAnswers: [] as string[],
   keyTerms: '',
+  gradingCriteria: '',
   similarityThreshold: 0.5,
   hasCode: false,
   codeSnippet: '',
@@ -58,6 +59,17 @@ export default function QuizEditorPage() {
   const [description, setDescription] = useState('')
   const [trialAnswer, setTrialAnswer] = useState('')
   const [trial, setTrial] = useState<{ similarity: number; passed: boolean } | null>(null)
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiTrial, setAiTrial] = useState<{ score: number; feedback: string; passed: boolean } | null>(null)
+  const [aiTrialBusy, setAiTrialBusy] = useState(false)
+  const [aiTrialError, setAiTrialError] = useState('')
+
+  useEffect(() => {
+    api
+      .health()
+      .then((h) => setAiEnabled(Boolean(h.aiGrading)))
+      .catch(() => setAiEnabled(false))
+  }, [])
 
   useEffect(() => {
     if (!token || !id) return
@@ -135,6 +147,7 @@ export default function QuizEditorPage() {
       expectedAnswer: q.expectedAnswer || '',
       expectedAnswers: [...(q.expectedAnswers || [])],
       keyTerms: (q.keyTerms || []).join('\n'),
+      gradingCriteria: q.gradingCriteria || '',
       similarityThreshold: q.similarityThreshold || 0.55,
       hasCode: Boolean(q.codeSnippet),
       codeSnippet: q.codeSnippet || '',
@@ -144,6 +157,34 @@ export default function QuizEditorPage() {
     })
     setTrialAnswer('')
     setTrial(null)
+    setAiTrial(null)
+    setAiTrialError('')
+  }
+
+  async function runAiTrial() {
+    if (!token) return
+    setAiTrialBusy(true)
+    setAiTrialError('')
+    setAiTrial(null)
+    try {
+      const res = await api.previewGrade(token, {
+        question: form.text,
+        text: trialAnswer,
+        expectedAnswer: form.expectedAnswer,
+        expectedAnswers: form.expectedAnswers.map((a) => a.trim()).filter(Boolean),
+        keyTerms: form.keyTerms
+          .split('\n')
+          .map((k) => k.trim())
+          .filter(Boolean),
+        gradingCriteria: form.gradingCriteria,
+        threshold: Number(form.similarityThreshold) || 0.55,
+      })
+      setAiTrial(res)
+    } catch (e) {
+      setAiTrialError(e instanceof Error ? e.message : 'Erro na correção por IA')
+    } finally {
+      setAiTrialBusy(false)
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -174,6 +215,7 @@ export default function QuizEditorPage() {
         .split('\n')
         .map((k) => k.trim())
         .filter(Boolean)
+      payload.gradingCriteria = form.gradingCriteria.trim()
       payload.similarityThreshold = Number(form.similarityThreshold) || 0.55
       payload.options = []
       payload.correctIndex = -1
@@ -188,6 +230,7 @@ export default function QuizEditorPage() {
       payload.expectedAnswer = ''
       payload.expectedAnswers = []
       payload.keyTerms = []
+      payload.gradingCriteria = ''
     }
 
     try {
@@ -406,6 +449,23 @@ export default function QuizEditorPage() {
                   )}
                 </div>
                 <label>
+                  Critérios de correção (o que vale nota)
+                  <textarea
+                    value={form.gradingCriteria}
+                    rows={4}
+                    maxLength={2000}
+                    placeholder={
+                      'Ex.: 50% — identifica que é especialização ("é um tipo de").\n50% — diz que a PK do filho também é FK para o pai (1:1).\nErro grave: criar AlunoId separado.'
+                    }
+                    onChange={(e) => setForm({ ...form, gradingCriteria: e.target.value })}
+                  />
+                </label>
+                <p className="muted tiny">
+                  {aiEnabled
+                    ? 'A correção é por contexto: a IA lê a resposta do aluno e julga se a ideia está certa, mesmo com outras palavras, usando a resposta de referência e estes critérios.'
+                    : 'A correção por contexto (IA) está desligada neste servidor; por enquanto vale a comparação por palavras abaixo.'}
+                </p>
+                <label>
                   Termos-chave da correção
                   <textarea
                     value={form.keyTerms}
@@ -420,7 +480,8 @@ export default function QuizEditorPage() {
                   ideia com outras palavras.
                 </p>
                 <label>
-                  Limiar de similaridade ({Math.round(form.similarityThreshold * 100)}%)
+                  {aiEnabled ? 'Nota mínima para contar acerto' : 'Limiar de similaridade'} (
+                  {Math.round(form.similarityThreshold * 100)}%)
                   <input
                     type="range"
                     min={0.3}
@@ -449,6 +510,26 @@ export default function QuizEditorPage() {
                     </p>
                   ) : (
                     <p className="muted tiny">O resultado aparece enquanto você digita.</p>
+                  )}
+                  {aiEnabled && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={aiTrialBusy || !trialAnswer.trim() || !form.expectedAnswer.trim()}
+                        onClick={runAiTrial}
+                      >
+                        {aiTrialBusy ? 'A IA está corrigindo...' : 'Testar com IA (por contexto)'}
+                      </button>
+                      {aiTrial && (
+                        <p className={`essay-trial-result ${aiTrial.passed ? 'ok' : 'ko'}`}>
+                          IA: nota {Math.round(aiTrial.score * 100)}/100 ·{' '}
+                          {aiTrial.passed ? 'contaria como acerto' : 'abaixo da nota mínima'}
+                          {aiTrial.feedback ? ` — ${aiTrial.feedback}` : ''}
+                        </p>
+                      )}
+                      {aiTrialError && <p className="error">{aiTrialError}</p>}
+                    </>
                   )}
                 </div>
               </>

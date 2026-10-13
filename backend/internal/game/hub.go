@@ -81,6 +81,10 @@ type answerRecord struct {
 	correct    bool
 	points     int
 	similarity float64
+	basePoints int
+	method     string
+	feedback   string
+	pending    bool
 }
 
 type Room struct {
@@ -97,6 +101,8 @@ type Room struct {
 	Host          *Client
 	Players       map[string]*Player
 	Answers       map[string]answerRecord
+	History       map[int]map[string]answerRecord
+	autoPaused    bool
 	timerCancel   context.CancelFunc
 	advanceCancel context.CancelFunc
 	mu            sync.Mutex
@@ -104,9 +110,10 @@ type Room struct {
 }
 
 type Hub struct {
-	mu    sync.RWMutex
-	rooms map[string]*Room
-	store store.Store
+	mu     sync.RWMutex
+	rooms  map[string]*Room
+	store  store.Store
+	grader EssayGrader
 }
 
 func NewHub(s store.Store) *Hub {
@@ -136,6 +143,7 @@ func (h *Hub) CreateRoom(quiz models.Quiz, questions []models.Question, teacherI
 		Phase:     PhaseLobby,
 		Players:   make(map[string]*Player),
 		Answers:   make(map[string]answerRecord),
+		History:   make(map[int]map[string]answerRecord),
 		hub:       h,
 	}
 	h.rooms[pin] = room
@@ -255,6 +263,8 @@ func (c *Client) handle(env Envelope) {
 		c.handleEnd()
 	case "presence":
 		c.handlePresence(env.Data)
+	case "grade_override":
+		c.handleGradeOverride(env.Data)
 	default:
 		c.sendError("unknown event: " + env.Type)
 	}
@@ -602,6 +612,8 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 	correct := false
 	points := 0
 	similarity := 0.0
+	basePoints := 0
+	method := ""
 	choice := -1
 	text := strings.TrimSpace(req.Text)
 
@@ -621,9 +633,10 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		}
 		similarity = GradeEssay(text, q)
 		correct = similarity >= threshold
+		basePoints = calcScore(q.Weight, q.TimeLimitSec, elapsed)
+		method = gradeMethodText
 		if similarity > 0 {
-			base := calcScore(q.Weight, q.TimeLimitSec, elapsed)
-			points = int(math.Round(float64(base) * similarity))
+			points = int(math.Round(float64(basePoints) * similarity))
 		}
 	default:
 		if req.Choice < 0 || req.Choice >= len(q.Options) {
@@ -661,6 +674,8 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 		correct:    correct,
 		points:     points,
 		similarity: similarity,
+		basePoints: basePoints,
+		method:     method,
 	}
 	c.emit("answer_ack", map[string]any{
 		"received": true,
@@ -744,6 +759,11 @@ func countAnsweredConnected(room *Room) int {
 func (r *Room) startQuestionLocked() {
 	r.cancelTimersLocked()
 	r.Answers = make(map[string]answerRecord)
+	if r.History == nil {
+		r.History = make(map[int]map[string]answerRecord)
+	}
+	r.History[r.CurrentIndex] = r.Answers
+	r.autoPaused = false
 	q := r.Questions[r.CurrentIndex]
 	limit := q.TimeLimitSec
 	if limit <= 0 {
@@ -833,10 +853,16 @@ func (r *Room) revealLocked() {
 		r.timerCancel = nil
 	}
 	r.Phase = PhaseReveal
+	grading := r.startAIGradingLocked()
 	payload := r.buildResultPayloadLocked()
 	qType := r.Questions[r.CurrentIndex].Type
 	if qType == "" {
 		qType = models.QuestionMultipleChoice
+	}
+	if grading {
+		payload["autoNextInSec"] = 0
+		r.broadcastLocked("question_result", payload)
+		return
 	}
 	hold := revealHoldSec(qType)
 	payload["autoNextInSec"] = hold
@@ -852,6 +878,7 @@ func (r *Room) buildResultPayloadLocked() map[string]any {
 	}
 
 	results := make([]map[string]any, 0, len(r.Players))
+	pending := false
 	for _, p := range r.Players {
 		ans, ok := r.Answers[p.ID]
 		entry := map[string]any{
@@ -870,15 +897,24 @@ func (r *Room) buildResultPayloadLocked() map[string]any {
 			entry["correct"] = ans.correct
 			entry["points"] = ans.points
 			entry["similarity"] = ans.similarity
+			entry["method"] = ans.method
+			entry["feedback"] = ans.feedback
+			entry["pending"] = ans.pending
+			if ans.pending {
+				pending = true
+			}
 		}
 		results = append(results, entry)
 	}
 
 	payload := map[string]any{
-		"type":         qType,
-		"correctIndex": q.CorrectIndex,
-		"results":      results,
-		"leaderboard":  leaderboard(r),
+		"type":          qType,
+		"questionIndex": r.CurrentIndex,
+		"correctIndex":  q.CorrectIndex,
+		"results":       results,
+		"leaderboard":   leaderboard(r),
+		"aiGrading":     pending,
+		"paused":        r.autoPaused,
 	}
 	if qType == models.QuestionEssay {
 		payload["expectedAnswer"] = q.ExpectedAnswer
@@ -943,16 +979,22 @@ func (r *Room) cancelTimersLocked() {
 func (r *Room) finishLocked() {
 	r.cancelTimersLocked()
 	r.Phase = PhaseFinished
-	board := leaderboard(r)
-	grades := r.gradesPayloadLocked()
+	r.broadcastFinishedLocked()
+	r.saveSessionLocked()
+}
+
+func (r *Room) broadcastFinishedLocked() {
 	r.broadcastLocked("finished", map[string]any{
-		"leaderboard": board,
-		"grades":      grades,
+		"leaderboard": leaderboard(r),
+		"grades":      r.gradesPayloadLocked(),
 		"quizTitle":   r.Quiz.Title,
 		"total":       len(r.Questions),
 		"maxScore":    maxQuizXP(r.Questions),
 	})
+}
 
+func (r *Room) saveSessionLocked() {
+	board := leaderboard(r)
 	ranking := make([]models.RankingEntry, 0, len(board))
 	for i, e := range board {
 		ranking = append(ranking, models.RankingEntry{
