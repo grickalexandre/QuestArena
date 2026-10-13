@@ -24,6 +24,7 @@ type draftQuestion struct {
 	expectedAnswer  string
 	expectedAnswers []string
 	keyTerms        []string
+	criteria        string
 	threshold       float64
 	timeLimitSec    int
 }
@@ -62,6 +63,7 @@ func (d draftQuestion) toQuestion(quizID string, order int) *models.Question {
 		if len(d.keyTerms) > 0 {
 			q.KeyTerms = append([]string{}, d.keyTerms...)
 		}
+		q.GradingCriteria = d.criteria
 		q.Options = nil
 		q.CorrectIndex = -1
 		if d.threshold > 0 {
@@ -86,6 +88,7 @@ func sameContent(a, b *models.Question) bool {
 		a.Weight == b.Weight &&
 		a.TimeLimitSec == b.TimeLimitSec &&
 		a.ExpectedAnswer == b.ExpectedAnswer &&
+		a.GradingCriteria == b.GradingCriteria &&
 		a.SimilarityThreshold == b.SimilarityThreshold &&
 		slices.Equal(a.Options, b.Options) &&
 		slices.Equal(a.ExpectedAnswers, b.ExpectedAnswers) &&
@@ -181,5 +184,8 @@ func EnsureAll(ctx context.Context, st store.Store, teacherID string) {
 	}
 	if err := EnsureRequisitosQuiz(ctx, st, teacherID); err != nil {
 		log.Printf("seed engenharia de requisitos quiz: %v", err)
+	}
+	if err := EnsureToStringQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed heranca tostring quiz: %v", err)
 	}
 }
