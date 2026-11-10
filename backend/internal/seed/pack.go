@@ -191,4 +191,7 @@ func EnsureAll(ctx context.Context, st store.Store, teacherID string) {
 	if err := EnsureSorveteriaQuiz(ctx, st, teacherID); err != nil {
 		log.Printf("seed heranca sorveteria quiz: %v", err)
 	}
+	if err := EnsureGerenciaConfiguracaoQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed gerencia de configuracao quiz: %v", err)
+	}
 }
