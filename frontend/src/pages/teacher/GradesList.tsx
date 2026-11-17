@@ -54,7 +54,7 @@ export function GradesList({
             {open.quizTitle} · PIN {open.pin}
           </h3>
           <p className="muted tiny">
-            Nota 0–10 = 70% acertos + 30% XP. Encerrada em {formatWhen(open.finishedAt)}.
+            Nota 0–10 = só pelos acertos (sem fator XP). Encerrada em {formatWhen(open.finishedAt)}.
           </p>
           {(open.ranking || []).length === 0 ? (
             <p className="muted">Nenhum aluno nesta partida.</p>

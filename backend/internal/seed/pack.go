@@ -11,6 +11,7 @@ import (
 
 const (
 	timeLimitOneMin  = 60
+	timeLimitTwoMin  = 120
 	timeLimitFiveMin = 300
 )
 
@@ -193,5 +194,8 @@ func EnsureAll(ctx context.Context, st store.Store, teacherID string) {
 	}
 	if err := EnsureGerenciaConfiguracaoQuiz(ctx, st, teacherID); err != nil {
 		log.Printf("seed gerencia de configuracao quiz: %v", err)
+	}
+	if err := EnsureEnadeRevisaoQuiz(ctx, st, teacherID); err != nil {
+		log.Printf("seed enade revisao quiz: %v", err)
 	}
 }

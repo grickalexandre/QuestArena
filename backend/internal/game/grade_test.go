@@ -2,25 +2,32 @@ package game
 
 import "testing"
 
-func TestCalcGradeAllCorrectInstant(t *testing.T) {
+func TestCalcGradeAllCorrect(t *testing.T) {
 	got := calcGrade(15, 15, 15000, 15000)
 	if got != 10 {
 		t.Fatalf("want 10, got %v", got)
 	}
 }
 
-func TestCalcGradeAllCorrectSlow(t *testing.T) {
-	// XP mínimo com 15 acertos no limite do tempo: 20% de 15000 = 3000
+func TestCalcGradeAllCorrectIgnoresXP(t *testing.T) {
+	// Mesmo com XP baixo, a nota depende só dos acertos.
 	got := calcGrade(15, 15, 3000, 15000)
-	if got != 7.6 {
-		t.Fatalf("want 7.6, got %v", got)
+	if got != 10 {
+		t.Fatalf("want 10 (sem fator XP), got %v", got)
 	}
 }
 
-func TestCalcGradeTwelveInstant(t *testing.T) {
+func TestCalcGradeTwelveOfFifteen(t *testing.T) {
 	got := calcGrade(12, 15, 12000, 15000)
 	if got != 8 {
 		t.Fatalf("want 8.0, got %v", got)
+	}
+}
+
+func TestCalcGradeZero(t *testing.T) {
+	got := calcGrade(0, 15, 0, 15000)
+	if got != 0 {
+		t.Fatalf("want 0, got %v", got)
 	}
 }
 

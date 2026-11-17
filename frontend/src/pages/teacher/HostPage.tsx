@@ -448,7 +448,7 @@ export default function HostPage() {
           <div className="grades-card">
             <h3>Notas da turma</h3>
             <p className="muted tiny">
-              Nota 0–10 = 70% acertos + 30% XP (quem responde mais rápido sobe a nota). Baixe o CSV para somar com
+              Nota 0–10 = só pelos acertos (sem fator XP). Baixe o CSV para somar com
               outros quizzes pelo RA.
             </p>
             <div className="grades-table-wrap">

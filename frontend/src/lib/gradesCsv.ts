@@ -22,7 +22,7 @@ function csvCell(value: string | number) {
 export function downloadGradesCsv(quizTitle: string, pin: string, grades: GradeCsvRow[]) {
   const header = ['RA', 'Apelido', 'Acertos', 'Total', 'XP', 'XP_max', 'Nota']
   const lines = [
-    '# Nota = 70% acertos + 30% XP (resposta mais rapida vale mais). Some as planilhas pelo RA.',
+    '# Nota = apenas acertos (sem fator XP). Some as planilhas pelo RA.',
     `# Quiz: ${quizTitle || 'QuestArena'} | PIN: ${pin}`,
     header.join(';'),
     ...grades.map((g) =>

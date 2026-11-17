@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	gradeCorrectWeight = 7.0
-	gradeSpeedWeight   = 3.0
+	gradeCorrectWeight = 10.0
 )
 
 func normalizeRA(raw string) string {
@@ -42,17 +41,14 @@ func maxQuizXP(questions []models.Question) int {
 	return int(math.Round(sum))
 }
 
-// calcGrade: 70% acertos + 30% XP (velocidade). Resultado 0–10 com 1 casa.
+// calcGrade: nota 0–10 só por acertos (sem fator de XP/velocidade).
 func calcGrade(correctCount, total, score, maxScore int) float64 {
+	_ = score
+	_ = maxScore
 	if total <= 0 {
 		return 0
 	}
-	acerto := (float64(correctCount) / float64(total)) * gradeCorrectWeight
-	vel := 0.0
-	if maxScore > 0 {
-		vel = (float64(score) / float64(maxScore)) * gradeSpeedWeight
-	}
-	n := acerto + vel
+	n := (float64(correctCount) / float64(total)) * gradeCorrectWeight
 	if n < 0 {
 		n = 0
 	}
