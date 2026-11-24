@@ -78,6 +78,7 @@ type QuestionResultPayload = {
   autoNextInSec?: number
   aiGrading?: boolean
   paused?: boolean
+  awardsXP?: boolean
 }
 
 const COLORS = ['#e21b3c', '#1368ce', '#d89e00', '#26890c']
@@ -101,6 +102,7 @@ export default function HostPage() {
   const [answered, setAnswered] = useState(0)
   const [error, setError] = useState('')
   const [quizTitle, setQuizTitle] = useState('')
+  const [awardsXP, setAwardsXP] = useState(true)
   const [hosted, setHosted] = useState(false)
   const [autoNextIn, setAutoNextIn] = useState<number | null>(null)
   const [grades, setGrades] = useState<GradeRow[]>([])
@@ -139,6 +141,7 @@ export default function HostPage() {
       setAiGrading(Boolean(d.aiGrading))
       setPaused(Boolean(d.paused))
       setBoard(d.leaderboard)
+      if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
       setEndsAt(null)
       setAutoNextIn(d.autoNextInSec ?? 5)
     }
@@ -149,6 +152,7 @@ export default function HostPage() {
           phase: string
           players: Player[]
           quizTitle: string
+          awardsXP?: boolean
           question?: PublicQuestion
           endsAt?: string
           questionResult?: QuestionResultPayload
@@ -162,6 +166,7 @@ export default function HostPage() {
         setPhase(d.phase)
         setPlayers(d.players || [])
         setQuizTitle(d.quizTitle)
+        if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
         if (d.question) setQuestion(d.question)
         if (d.endsAt && d.phase === 'question') setEndsAt(new Date(d.endsAt).getTime())
         if (d.questionResult) applyResult(d.questionResult)
@@ -201,10 +206,11 @@ export default function HostPage() {
         if (d.leaderboard) setBoard(d.leaderboard)
       }),
       on('finished', (data) => {
-        const d = data as { leaderboard: BoardEntry[]; grades?: GradeRow[] }
+        const d = data as { leaderboard: BoardEntry[]; grades?: GradeRow[]; awardsXP?: boolean }
         setPhase('finished')
         setBoard(d.leaderboard)
         setGrades(d.grades || [])
+        if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
         setAutoNextIn(null)
       }),
       on('error', (data) => {
@@ -443,12 +449,12 @@ export default function HostPage() {
       {phase === 'finished' && (
         <section className="host-question">
           <h2>Partida encerrada</h2>
-          <Podium board={board} />
-          <Leaderboard board={board} />
+          <Podium board={board} awardsXP={awardsXP} />
+          <Leaderboard board={board} awardsXP={awardsXP} />
           <div className="grades-card">
             <h3>Notas da turma</h3>
             <p className="muted tiny">
-              Nota 0–10 = só pelos acertos (sem fator XP). Baixe o CSV para somar com
+              Nota 0–10 = só pelos acertos{awardsXP ? ' (sem fator XP)' : ' · esta quest não dá XP'}. Baixe o CSV para somar com
               outros quizzes pelo RA.
             </p>
             <div className="grades-table-wrap">
@@ -459,7 +465,7 @@ export default function HostPage() {
                     <th>RA</th>
                     <th>Apelido</th>
                     <th>Acertos</th>
-                    <th>XP</th>
+                    {awardsXP ? <th>XP</th> : null}
                     <th>Nota</th>
                   </tr>
                 </thead>
@@ -475,10 +481,12 @@ export default function HostPage() {
                           {row.correctCount ?? '—'}
                           {row.total != null ? `/${row.total}` : ''}
                         </td>
-                        <td>
-                          {row.score}
-                          {row.maxScore != null ? `/${row.maxScore}` : ''}
-                        </td>
+                        {awardsXP ? (
+                          <td>
+                            {row.score}
+                            {row.maxScore != null ? `/${row.maxScore}` : ''}
+                          </td>
+                        ) : null}
                         <td>
                           <strong>{formatGrade(row.grade)}</strong>
                         </td>
@@ -672,7 +680,7 @@ function PresencePanel({
   )
 }
 
-export function Leaderboard({ board }: { board: BoardEntry[] }) {
+export function Leaderboard({ board, awardsXP = true }: { board: BoardEntry[]; awardsXP?: boolean }) {
   return (
     <ol className="leaderboard">
       {board.map((e) => (
@@ -685,14 +693,16 @@ export function Leaderboard({ board }: { board: BoardEntry[] }) {
             {e.nickname}
             {e.ra ? <span className="muted tiny"> · {e.ra}</span> : null}
           </span>
-          <span className="xp">{e.score} XP</span>
+          <span className="xp">
+            {awardsXP ? `${e.score} XP` : `${e.correctCount ?? 0} acertos`}
+          </span>
         </li>
       ))}
     </ol>
   )
 }
 
-export function Podium({ board }: { board: BoardEntry[] }) {
+export function Podium({ board, awardsXP = true }: { board: BoardEntry[]; awardsXP?: boolean }) {
   const top = useMemo(() => {
     const [first, second, third] = board
     return [
@@ -711,7 +721,7 @@ export function Podium({ board }: { board: BoardEntry[] }) {
           </span>
           <strong>{entry!.nickname}</strong>
           {entry!.ra ? <span className="muted tiny">RA {entry!.ra}</span> : null}
-          <span>{entry!.score} XP</span>
+          <span>{awardsXP ? `${entry!.score} XP` : `${entry!.correctCount ?? 0} acertos`}</span>
           {entry!.grade != null ? <span>Nota {formatGrade(entry!.grade)}</span> : null}
           <div className="block">{place}</div>
         </div>

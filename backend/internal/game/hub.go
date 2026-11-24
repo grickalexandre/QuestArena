@@ -301,6 +301,7 @@ func (c *Client) handleHostJoin(data json.RawMessage) {
 		"phase":         room.Phase,
 		"players":       publicPlayers(room),
 		"questionCount": len(room.Questions),
+		"awardsXP":      quizAwardsXP(room.Quiz.ID),
 	}
 	if room.Phase == PhaseQuestion || room.Phase == PhaseReveal {
 		payload["question"] = publicQuestion(room)
@@ -437,6 +438,7 @@ func playerStatePayload(room *Room, player *Player) map[string]any {
 		"choice":    player.choice,
 		"forfeited": player.forfeited,
 		"score":     player.Score,
+		"awardsXP":  quizAwardsXP(room.Quiz.ID),
 	}
 	if room.Phase == PhaseQuestion || room.Phase == PhaseReveal {
 		payload["question"] = publicQuestion(room)
@@ -649,6 +651,11 @@ func (c *Client) handleAnswer(data json.RawMessage) {
 			similarity = 1
 			points = calcScore(q.Weight, q.TimeLimitSec, elapsed)
 		}
+	}
+
+	if !quizAwardsXP(room.Quiz.ID) {
+		points = 0
+		basePoints = 0
 	}
 
 	if _, ok := room.Answers[player.ID]; ok {
@@ -915,6 +922,7 @@ func (r *Room) buildResultPayloadLocked() map[string]any {
 		"leaderboard":   leaderboard(r),
 		"aiGrading":     pending,
 		"paused":        r.autoPaused,
+		"awardsXP":      quizAwardsXP(r.Quiz.ID),
 	}
 	if qType == models.QuestionEssay {
 		payload["expectedAnswer"] = q.ExpectedAnswer
@@ -989,7 +997,8 @@ func (r *Room) broadcastFinishedLocked() {
 		"grades":      r.gradesPayloadLocked(),
 		"quizTitle":   r.Quiz.Title,
 		"total":       len(r.Questions),
-		"maxScore":    maxQuizXP(r.Questions),
+		"maxScore":    maxQuizXP(r.Quiz.ID, r.Questions),
+		"awardsXP":    quizAwardsXP(r.Quiz.ID),
 	})
 }
 
@@ -1004,7 +1013,7 @@ func (r *Room) saveSessionLocked() {
 			Score:        e["score"].(int),
 			CorrectCount: e["correctCount"].(int),
 			Total:        len(r.Questions),
-			MaxScore:     maxQuizXP(r.Questions),
+			MaxScore:     maxQuizXP(r.Quiz.ID, r.Questions),
 			Grade:        e["grade"].(float64),
 			Rank:         i + 1,
 		})
@@ -1031,7 +1040,7 @@ func (r *Room) saveSessionLocked() {
 }
 
 func (r *Room) gradesPayloadLocked() []map[string]any {
-	maxScore := maxQuizXP(r.Questions)
+	maxScore := maxQuizXP(r.Quiz.ID, r.Questions)
 	total := len(r.Questions)
 	board := leaderboard(r)
 	out := make([]map[string]any, 0, len(board))
@@ -1057,13 +1066,20 @@ func leaderboard(r *Room) []map[string]any {
 	for _, p := range r.Players {
 		list = append(list, p)
 	}
+	awardsXP := quizAwardsXP(r.Quiz.ID)
 	sort.Slice(list, func(i, j int) bool {
+		if !awardsXP {
+			if list[i].CorrectCount == list[j].CorrectCount {
+				return list[i].Nickname < list[j].Nickname
+			}
+			return list[i].CorrectCount > list[j].CorrectCount
+		}
 		if list[i].Score == list[j].Score {
 			return list[i].Nickname < list[j].Nickname
 		}
 		return list[i].Score > list[j].Score
 	})
-	maxScore := maxQuizXP(r.Questions)
+	maxScore := maxQuizXP(r.Quiz.ID, r.Questions)
 	total := len(r.Questions)
 	out := make([]map[string]any, 0, len(list))
 	for i, p := range list {

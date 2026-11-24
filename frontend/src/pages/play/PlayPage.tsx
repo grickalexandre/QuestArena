@@ -32,6 +32,7 @@ type BoardEntry = {
   ra?: string
   avatar: number
   score: number
+  correctCount?: number
   grade?: number
 }
 
@@ -56,6 +57,7 @@ type QuestionResult = {
   results: ResultEntry[]
   autoNextInSec?: number
   aiGrading?: boolean
+  awardsXP?: boolean
 }
 
 type JoinedPayload = {
@@ -63,6 +65,7 @@ type JoinedPayload = {
   nickname?: string
   ra?: string
   quizTitle: string
+  awardsXP?: boolean
   avatar?: number
   phase?: 'lobby' | 'question' | 'reveal' | 'finished'
   answered?: boolean
@@ -116,6 +119,7 @@ export default function PlayPage() {
   const [phase, setPhase] = useState<'join' | 'lobby' | 'question' | 'reveal' | 'finished'>('join')
   const [playerId, setPlayerId] = useState(saved?.playerId ?? '')
   const [quizTitle, setQuizTitle] = useState('')
+  const [awardsXP, setAwardsXP] = useState(true)
   const [question, setQuestion] = useState<PublicQuestion | null>(null)
   const [endsAt, setEndsAt] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
@@ -193,6 +197,7 @@ export default function PlayPage() {
     setExpectedAnswer(d.expectedAnswer || '')
     setExpectedAnswers(d.expectedAnswers || [])
     setBoard(d.leaderboard)
+    if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
     setEndsAt(null)
     setAutoNextIn(d.autoNextInSec ?? 5)
     const mine = d.results.find((r) => r.playerId === id)
@@ -224,6 +229,7 @@ export default function PlayPage() {
         const d = data as JoinedPayload
         setPlayerId(d.playerId)
         setQuizTitle(d.quizTitle)
+        if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
         if (d.nickname) setNickname(d.nickname)
         if (d.ra) setRa(d.ra)
         if (typeof d.avatar === 'number') setAvatar(d.avatar)
@@ -276,8 +282,10 @@ export default function PlayPage() {
         if (d.leaderboard) setBoard(d.leaderboard)
       }),
       on('finished', (data) => {
+        const d = data as { leaderboard: BoardEntry[]; awardsXP?: boolean }
         setPhase('finished')
-        setBoard((data as { leaderboard: BoardEntry[] }).leaderboard)
+        setBoard(d.leaderboard)
+        if (typeof d.awardsXP === 'boolean') setAwardsXP(d.awardsXP)
         setAutoNextIn(null)
         setReconnecting(false)
       }),
@@ -570,7 +578,7 @@ export default function PlayPage() {
                       </div>
                       <p className={`result-banner ${lastCorrect ? 'ok' : 'ko'}`}>
                         {lastCorrect ? 'Resposta aceita' : 'Não atingiu o mínimo'}
-                        {lastPoints != null ? ` · +${lastPoints} XP` : ''}
+                        {awardsXP && lastPoints != null ? ` · +${lastPoints} XP` : ''}
                         {lastMethod === 'professor' ? ' · nota revisada pelo professor' : ''}
                       </p>
                       {lastFeedback && <p className="ai-feedback">{lastFeedback}</p>}
@@ -614,8 +622,14 @@ export default function PlayPage() {
                       )
                     })}
                   </div>
-                  <p className={`result-banner ${lastPoints && lastPoints > 0 ? 'ok' : 'ko'}`}>
-                    {lastPoints && lastPoints > 0 ? `+${lastPoints} XP` : 'Sem XP nesta rodada'}
+                  <p className={`result-banner ${lastCorrect ? 'ok' : 'ko'}`}>
+                    {awardsXP
+                      ? lastPoints && lastPoints > 0
+                        ? `+${lastPoints} XP`
+                        : 'Sem XP nesta rodada'
+                      : lastCorrect
+                        ? 'Resposta correta'
+                        : 'Resposta incorreta'}
                   </p>
                 </>
               )}
@@ -632,8 +646,8 @@ export default function PlayPage() {
       {phase === 'finished' && (
         <section className="play-question">
           <h2>Fim da quest!</h2>
-          <Podium board={board} />
-          <Leaderboard board={board} />
+          <Podium board={board} awardsXP={awardsXP} />
+          <Leaderboard board={board} awardsXP={awardsXP} />
           <p className="muted">
             Sua posição: {myRank ? `#${myRank.rank}` : '—'}
             {myRank?.grade != null ? ` · Nota ${myRank.grade.toFixed(1).replace('.', ',')}` : ''}

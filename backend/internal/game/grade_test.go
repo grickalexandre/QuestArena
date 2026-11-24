@@ -2,6 +2,18 @@ package game
 
 import "testing"
 
+func TestQuizAwardsXP(t *testing.T) {
+	if quizAwardsXP("seed-enade-revisao-teacher1") {
+		t.Fatal("Quest 12 ENADE must not award XP")
+	}
+	if !quizAwardsXP("seed-gcs-teacher1") {
+		t.Fatal("other quizzes should award XP")
+	}
+	if maxQuizXP("seed-enade-revisao-x", nil) != 0 {
+		t.Fatal("ENADE max XP must be 0")
+	}
+}
+
 func TestCalcGradeAllCorrect(t *testing.T) {
 	got := calcGrade(15, 15, 15000, 15000)
 	if got != 10 {

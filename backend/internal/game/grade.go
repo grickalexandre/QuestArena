@@ -29,7 +29,15 @@ func validRA(ra string) bool {
 	return true
 }
 
-func maxQuizXP(questions []models.Question) int {
+// quizAwardsXP: Quest 12 (ENADE) não dá XP — só acertos/nota.
+func quizAwardsXP(quizID string) bool {
+	return !strings.HasPrefix(quizID, "seed-enade-revisao-")
+}
+
+func maxQuizXP(quizID string, questions []models.Question) int {
+	if !quizAwardsXP(quizID) {
+		return 0
+	}
 	sum := 0.0
 	for _, q := range questions {
 		w := q.Weight
